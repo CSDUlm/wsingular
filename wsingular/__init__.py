@@ -4,8 +4,7 @@ from typing import Tuple
 import torch
 import ot
 import numpy as np
-
-# TODO: use Tensorboard
+from torch.utils.tensorboard import SummaryWriter
 
 ############################## HELPER FUNCTIONS ###############################
 
@@ -66,6 +65,35 @@ def hilbert_distance(D_1: torch.Tensor, D_2: torch.Tensor) -> float:
 
     # Return the Hilbert projective metric.
     return float((div.max() - div.min()).cpu())
+
+def normalize_dataset(
+    dataset: torch.Tensor,
+    normalization_steps: int = 1) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Normalize the dataset and return the normalized dataset A and the
+    transposed dataset B.
+
+    Args:
+        dataset (torch.Tensor): The input dataset.
+        normalization_steps (int, optional): The number of Sinkhorn
+        normalization steps. For large numbers, we get bistochastic matrices.
+        TODO: check that. Defaults to 1 and should be larger or equal to 1..
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: The normalized matrices A and B
+    """
+
+    # Check that `normalization_steps` > 0:
+    assert(normalization_steps > 0)
+
+    # Do a first normalization pass
+    A, B = dataset/dataset.sum(0), dataset.T/dataset.T.sum(0)
+
+    # Make any additional normalization steps.
+    for _ in range(normalization_steps - 1):
+        A, B = B.T/B.T.sum(0), A.T/A.T.sum(0)
+    
+    return A, B
+
 
 ################################ DISTANCE MAPS ################################
 
@@ -185,6 +213,8 @@ def stochastic_wasserstein_map(
     # Iterate over random indices.
     # TODO: is this the way?
     for k in np.random.choice(range(len(ii)), size=sample_size, replace=False):
+
+        # Define the index to update.
         i, j = ii[k], jj[k]
 
         # Compute the Wasserstein distances.
@@ -233,6 +263,8 @@ def stochastic_sinkhorn_map(
     # Iterate over random indices.
     # TODO: is this the way?
     for k in np.random.choice(range(len(ii)), size=sample_size, replace=False):
+
+        # Define the index to update.
         i, j = ii[k], jj[k]
 
         # Compute the Sinkhorn divergences.
@@ -251,7 +283,7 @@ def stochastic_sinkhorn_map(
 
 def wasserstein_singular_vectors(
     dataset: torch.Tensor, tau: float,
-    p: int, dtype: str, device: str, max_iter: int,
+    p: int, dtype: str, device: str, max_iter: int, tb_comment: str,
     normalization_steps: int = 1) -> Tuple[torch.Tensor, torch.Tensor]:
     """Performs power iterations and return Wasserstein Singular Vectors.
 
@@ -274,12 +306,8 @@ def wasserstein_singular_vectors(
     # Name the dimensions of the dataset.
     m, n = dataset.shape
 
-    # Make the transposed datasets A and B from the dataset U.
-    A, B = dataset/dataset.sum(0), dataset.T/dataset.T.sum(0)
-
-    # Make any additional normalization steps.
-    for _ in range(normalization_steps - 1):
-        A, B = B.T/B.T.sum(0), A.T/A.T.sum(0)
+    # Make the transposed datasets A and B from the dataset.
+    A, B = normalize_dataset(dataset, normalization_steps)
     
     # Initialize a random cost matrix.
     C = random_distance(m, dtype=dtype, device=device)
@@ -289,17 +317,17 @@ def wasserstein_singular_vectors(
     R_A = regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = regularization_matrix(B, p=p, dtype=dtype, device=device)
 
-    # Initialize the loss histories.
-    loss_C, loss_D = [], []
+    # Setup TensorBoard writer.
+    writer = SummaryWriter(comment=tb_comment)
 
     # Iterate until `max_iter`.
-    for _ in range(max_iter):
+    for n_iter in range(max_iter):
 
         # Compute D using C
         D_new = wasserstein_map(A, C, R_A, tau=tau, dtype=dtype, device=device)
 
         # Compute Hilbert loss
-        loss_D.append(hilbert_distance(D, D_new))
+        writer.add_scalar('Hilbert D', hilbert_distance(D, D_new), n_iter)
 
         # Normalize D
         D = D_new/D_new.max()
@@ -308,18 +336,21 @@ def wasserstein_singular_vectors(
         C_new = wasserstein_map(B, D, R_B, tau=tau, dtype=dtype, device=device)
 
         # Compute Hilbert loss
-        loss_C.append(hilbert_distance(C, C_new))
+        writer.add_scalar('Hilbert C', hilbert_distance(C, C_new), n_iter)
 
         # Normalize C
         C = C_new/C_new.max()
 
         # TODO: Try early stopping.
+    
+    # Close TensorBoard writer.
+    writer.close()
 
     return C, D
 
 def sinkhorn_singular_vectors(
     dataset: torch.Tensor, tau: float, eps: float,
-    p: int, dtype: str, device: str, max_iter: int,
+    p: int, dtype: str, device: str, max_iter: int, tb_comment: str,
     normalization_steps: int = 1) -> Tuple[torch.Tensor, torch.Tensor]:
     """Performs power iterations and return Sinkhorn Singular Vectors.
 
@@ -344,11 +375,7 @@ def sinkhorn_singular_vectors(
     m, n = dataset.shape
 
     # Make the transposed datasets A and B from the dataset U.
-    A, B = dataset/dataset.sum(0), dataset.T/dataset.T.sum(0)
-
-    # Make any additional normalization steps.
-    for _ in range(normalization_steps - 1):
-        A, B = B.T/B.T.sum(0), A.T/A.T.sum(0)
+    A, B = normalize_dataset(dataset, normalization_steps)
     
     # Initialize a random cost matrix.
     C = random_distance(m, dtype=dtype, device=device)
@@ -357,11 +384,11 @@ def sinkhorn_singular_vectors(
     R_A = regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = regularization_matrix(B, p=p, dtype=dtype, device=device)
 
-    # Initialize the loss histories.
-    loss_C, loss_D = [], []
+    # Setup TensorBoard writer.
+    writer = SummaryWriter(comment=tb_comment)
 
     # Iterate until `max_iter`.
-    for _ in range(max_iter):
+    for n_iter in range(max_iter):
 
         # Compute D using C
         D_new = sinkhorn_map(
@@ -369,7 +396,7 @@ def sinkhorn_singular_vectors(
             dtype=dtype, device=device)
 
         # Compute Hilbert loss
-        loss_D.append(hilbert_distance(D, D_new))
+        writer.add_scalar('Hilbert D', hilbert_distance(D, D_new), n_iter)
 
         # Normalize D
         D = D_new/D_new.max()
@@ -380,12 +407,15 @@ def sinkhorn_singular_vectors(
             dtype=dtype, device=device)
 
         # Compute Hilbert loss
-        loss_C.append(hilbert_distance(C, C_new))
+        writer.add_scalar('Hilbert C', hilbert_distance(C, C_new), n_iter)
 
         # Normalize C
         C = C_new/C_new.max()
 
         # TODO: Try early stopping.
+    
+    # Close TensorBoard writer.
+    writer.close()
 
     return C, D
 
@@ -393,7 +423,7 @@ def sinkhorn_singular_vectors(
 
 def stochastic_wasserstein_singular_vectors(
     dataset: torch.Tensor, tau: float, sample_size: int,
-    p: int, dtype: str, device: str, max_iter: int,
+    p: int, dtype: str, device: str, max_iter: int, tb_comment: str,
     normalization_steps: int = 1) -> Tuple[torch.Tensor, torch.Tensor]:
     """Performs power iterations and return Wasserstein Singular Vectors.
 
@@ -418,11 +448,7 @@ def stochastic_wasserstein_singular_vectors(
     m, n = dataset.shape
 
     # Make the transposed datasets A and B from the dataset U.
-    A, B = dataset/dataset.sum(0), dataset.T/dataset.T.sum(0)
-
-    # Make any additional normalization steps.
-    for _ in range(normalization_steps - 1):
-        A, B = B.T/B.T.sum(0), A.T/A.T.sum(0)
+    A, B = normalize_dataset(dataset, normalization_steps)
     
     # Initialize a random cost matrix.
     C = random_distance(m, dtype=dtype, device=device)
@@ -431,8 +457,8 @@ def stochastic_wasserstein_singular_vectors(
     R_A = regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = regularization_matrix(B, p=p, dtype=dtype, device=device)
 
-    # Initialize loss histories.
-    loss_D, loss_C = [], []
+    # Setup TensorBoard writer.
+    writer = SummaryWriter(comment=tb_comment)
 
     # Iterate until `max_iter`.
     for k in range(1, max_iter):
@@ -446,7 +472,7 @@ def stochastic_wasserstein_singular_vectors(
             tau=tau, dtype=dtype, device=device)
 
         # Compute Hilbert loss.
-        loss_D.append(hilbert_distance(D, D_new))
+        writer.add_scalar('Hilbert D', hilbert_distance(D, D_new), k)
 
         # Normalize D.
         D = D_new/D_new.max()
@@ -457,18 +483,21 @@ def stochastic_wasserstein_singular_vectors(
             tau=tau, dtype=dtype, device=device)
 
         # Compute Hilbert loss.
-        loss_C.append(hilbert_distance(C, C_new))
+        writer.add_scalar('Hilbert C', hilbert_distance(C, C_new), k)
 
         # Normalize D.
         C = C_new/C_new.max()
 
         # TODO: Try early stopping.
+    
+    # Close TensorBoard writer.
+    writer.close()
 
     return C, D
 
 def stochastic_sinkhorn_singular_vectors(
     dataset: torch.Tensor, tau: float, eps: float, sample_size: int,
-    p: int, dtype: str, device: str, max_iter: int,
+    p: int, dtype: str, device: str, max_iter: int, tb_comment: str,
     normalization_steps: int = 1) -> Tuple[torch.Tensor, torch.Tensor]:
     """Performs power iterations and return Sinkhorn Singular Vectors.
 
@@ -494,11 +523,7 @@ def stochastic_sinkhorn_singular_vectors(
     m, n = dataset.shape
 
     # Make the transposed datasets A and B from the dataset U.
-    A, B = dataset/dataset.sum(0), dataset.T/dataset.T.sum(0)
-
-    # Make any additional normalization steps.
-    for _ in range(normalization_steps - 1):
-        A, B = B.T/B.T.sum(0), A.T/A.T.sum(0)
+    A, B = normalize_dataset(dataset, normalization_steps)
     
     # Initialize a random cost matrix.
     C = random_distance(m, dtype=dtype, device=device)
@@ -507,8 +532,8 @@ def stochastic_sinkhorn_singular_vectors(
     R_A = regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = regularization_matrix(B, p=p, dtype=dtype, device=device)
 
-    # Initialize loss histories.
-    loss_D, loss_C = [], []
+    # Setup TensorBoard writer.
+    writer = SummaryWriter(comment=tb_comment)
 
     # Iterate until `max_iter`.
     for k in range(1, max_iter):
@@ -522,7 +547,7 @@ def stochastic_sinkhorn_singular_vectors(
             eps=eps, dtype=dtype, device=device)
 
         # Compute Hilbert loss.
-        loss_D.append(hilbert_distance(D, D_new))
+        writer.add_scalar('Hilbert D', hilbert_distance(D, D_new), k)
 
         # Normalize D.
         D = D_new/D_new.max()
@@ -533,11 +558,14 @@ def stochastic_sinkhorn_singular_vectors(
             eps=eps, dtype=dtype, device=device)
 
         # Compute Hilbert loss.
-        loss_C.append(hilbert_distance(C, C_new))
+        writer.add_scalar('Hilbert C', hilbert_distance(C, C_new), k)
 
         # Normalize D.
         C = C_new/C_new.max()
 
         # TODO: Try early stopping.
+    
+    # Close TensorBoard writer.
+    writer.close()
 
     return C, D
