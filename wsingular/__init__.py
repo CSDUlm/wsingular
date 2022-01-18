@@ -3,6 +3,7 @@
 # Matrices
 import torch
 import numpy as np
+import pandas as pd
 
 # Optimal Transport
 import ot
@@ -11,7 +12,17 @@ import ot
 from torch.utils.tensorboard import SummaryWriter
 
 # Typing
-from typing import Tuple
+from typing import Iterable, List, Tuple
+
+# Silhouette score
+from sklearn.metrics import silhouette_score
+
+# TSNE
+from sklearn.manifold import TSNE
+
+# Plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 ############################## HELPER FUNCTIONS ###############################
 
@@ -108,6 +119,31 @@ def normalize_dataset(
     
     return A, B
 
+def check_uniqueness(
+    A: torch.Tensor, B: torch.Tensor, C: torch.Tensor,
+    D: torch.Tensor, dtype: str, device: str) -> bool:
+    # TODO: check uniqueness
+    pass
+
+def silhouette(D: torch.Tensor, labels: Iterable) -> float:
+    """Return the average silhouette score, given a distance matrix and labels.
+
+    Args:
+        D (torch.Tensor): Distance matrix n*n
+        labels (Iterable): n labels
+
+    Returns:
+        float: The average silhouette score
+    """
+    return silhouette_score(D.cpu(), labels, metric='precomputed')
+
+def viz_TSNE(D: torch.Tensor, labels: Iterable = None) -> None:
+    tsne = TSNE(n_components=2, random_state=0, metric='precomputed', square_distances=True)
+    embed = tsne.fit_transform(D.cpu())
+    df = pd.DataFrame(embed, columns=['x', 'y'])
+    df['label'] = labels
+    sns.scatterplot(data=df, x='x', y='y', hue='label')
+    pass
 
 ################################ DISTANCE MAPS ################################
 
@@ -175,21 +211,28 @@ def sinkhorn_map(A: torch.Tensor, C: torch.Tensor, R: torch.Tensor,
     # Create an empty distance matrix to be populated.
     D = torch.zeros(n, n, dtype=dtype, device=device)
 
+    K = (-C/eps).exp()
+
     # Iterate over the lines.
     for i in range(A.shape[1]):
 
         # Compute the Sinkhorn costs
         # TODO: this only returns the linear term. Use logs
-        wass = ot.sinkhorn(A[:,i].contiguous(), A[:,:i+1].contiguous(), C, eps)
+        wass, wass_log = ot.sinkhorn(A[:,i].contiguous(), A[:,:i+1].contiguous(), C, eps, log=True)
+
+        f = eps*wass_log['u'].log()
+        g = eps*wass_log['v'].log()
+
+        wass = (f*A[:,[i]*(i+1)] + g*A[:,:i+1]  - eps*wass_log['u']*(K@wass_log['v'])).sum(0)
 
         # Add them in the distance matrix (including symmetric values).
-        D[i,:i+1] = D[:i+1,i] = torch.Tensor(wass)
+        D[i,:i+1] = D[:i+1,i] = wass#torch.Tensor(wass)
     
     # Get the diagonal terms OT_eps(a, a)
     d = torch.diagonal(D)
 
     # Sinkhorn divergence OT(a, b) - (OT(a, a) + OT(b, b))/2
-    D = D - .5*(d.view(-1, 1) + d.view(-1, 1))
+    D = D - .5*(d.view(-1, 1) + d.view(1, -1))
 
     # Make sure there are no negative values.
     assert((D < 0).sum() == 0)
@@ -305,6 +348,8 @@ def stochastic_sinkhorn_map(
     # Initialize new distance
     D_new = D.clone()
 
+    K = (-C/eps).exp()
+
     # Iterate over random indices.
     # TODO: is this the way?
     # Iterate over the lines.
@@ -312,16 +357,21 @@ def stochastic_sinkhorn_map(
 
         # Compute the Sinkhorn costs
         # TODO: this only returns the linear term. Use logs
-        wass = ot.sinkhorn(A[:,ii[k]].contiguous(), A[:,ii[:k+1]].contiguous(), C, eps)
+        wass, wass_log = ot.sinkhorn(A[:,ii[k]].contiguous(), A[:,ii[:k+1]].contiguous(), C, eps, log=True)
+
+        f = eps*wass_log['u'].log()
+        g = eps*wass_log['v'].log()
+
+        wass = (f*A[:,[ii[k]]*(k+1)] + g*A[:,ii[:k+1]] - eps*wass_log['u']*(K@wass_log['v'])).sum(0)
 
         # Add them in the distance matrix (including symmetric values).
-        D_new[ii[k],ii[:k+1]] = D_new[ii[:k+1],ii[k]] = torch.Tensor(wass)
+        D_new[ii[k],ii[:k+1]] = D_new[ii[:k+1],ii[k]] = wass#torch.Tensor(wass)
     
     # Get the diagonal terms OT_eps(a, a)
     d = torch.diagonal(D_new)
 
     # Sinkhorn divergence OT(a, b) - (OT(a, a) + OT(b, b))/2
-    D_new = D_new - .5*(d.view(-1, 1) + d.view(-1, 1))
+    D_new = D_new - .5*(d.view(-1, 1) + d.view(1, -1))
 
     # Make sure there are no negative values.
     assert((D_new < 0).sum() == 0)
@@ -447,7 +497,7 @@ def sinkhorn_singular_vectors(
     
     # Initialize a random cost matrix.
     C = random_distance(m, dtype=dtype, device=device)
-    D = random_distance(n, dtype=dtype, device=device)    
+    D = random_distance(n, dtype=dtype, device=device)
 
     # Compute the regularization matrices.
     R_A = regularization_matrix(A, p=p, dtype=dtype, device=device)
