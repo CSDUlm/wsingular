@@ -138,12 +138,19 @@ def silhouette(D: torch.Tensor, labels: Iterable) -> float:
     return silhouette_score(D.cpu(), labels, metric='precomputed')
 
 def viz_TSNE(D: torch.Tensor, labels: Iterable = None) -> None:
-    tsne = TSNE(n_components=2, random_state=0, metric='precomputed', square_distances=True)
+    """Visualize a distance matrix using a precomputed distance matrix.
+
+    Args:
+        D (torch.Tensor): Distance matrix
+        labels (Iterable, optional): The labels, if any. Defaults to None.
+    """    
+    tsne = TSNE(
+        n_components=2, random_state=0,
+        metric='precomputed', square_distances=True)
     embed = tsne.fit_transform(D.cpu())
     df = pd.DataFrame(embed, columns=['x', 'y'])
     df['label'] = labels
     sns.scatterplot(data=df, x='x', y='y', hue='label')
-    pass
 
 ################################ DISTANCE MAPS ################################
 
@@ -216,22 +223,33 @@ def sinkhorn_map(A: torch.Tensor, C: torch.Tensor, R: torch.Tensor,
     # Iterate over the lines.
     for i in range(A.shape[1]):
 
-        # Compute the Sinkhorn costs
-        # TODO: this only returns the linear term. Use logs
-        wass, wass_log = ot.sinkhorn(A[:,i].contiguous(), A[:,:i+1].contiguous(), C, eps, log=True)
+        # Compute the Sinkhorn dual variables
+        _, wass_log = ot.sinkhorn(
+            A[:,i].contiguous(), # This is the source histogram.
+            A[:,:i+1].contiguous(), # These are the target histograms.
+            C, # This is the ground cost.
+            eps, # This is the regularization parameter.
+            log=True # Return the dual variables
+        )
 
-        f = eps*wass_log['u'].log()
-        g = eps*wass_log['v'].log()
+        # Compute the exponential dual potentials.
+        f, g = eps*wass_log['u'].log(), eps*wass_log['v'].log()
 
-        wass = (f*A[:,[i]*(i+1)] + g*A[:,:i+1]  - eps*wass_log['u']*(K@wass_log['v'])).sum(0)
+        # Compute the Sinkhorn costs.
+        # These will be used to compute the Sinkhorn divergences
+        wass = (
+            f*A[:,[i]*(i+1)] +
+            g*A[:,:i+1] -
+            eps*wass_log['u']*(K@wass_log['v'])
+        ).sum(0)
 
         # Add them in the distance matrix (including symmetric values).
-        D[i,:i+1] = D[:i+1,i] = wass#torch.Tensor(wass)
+        D[i,:i+1] = D[:i+1,i] = wass
     
-    # Get the diagonal terms OT_eps(a, a)
+    # Get the diagonal terms OT_eps(a, a).
     d = torch.diagonal(D)
 
-    # Sinkhorn divergence OT(a, b) - (OT(a, a) + OT(b, b))/2
+    # The Sinkhorn divergence is OT(a, b) - (OT(a, a) + OT(b, b))/2.
     D = D - .5*(d.view(-1, 1) + d.view(1, -1))
 
     # Make sure there are no negative values.
@@ -351,21 +369,30 @@ def stochastic_sinkhorn_map(
     K = (-C/eps).exp()
 
     # Iterate over random indices.
-    # TODO: is this the way?
-    # Iterate over the lines.
     for k in range(sample_size):
 
-        # Compute the Sinkhorn costs
-        # TODO: this only returns the linear term. Use logs
-        wass, wass_log = ot.sinkhorn(A[:,ii[k]].contiguous(), A[:,ii[:k+1]].contiguous(), C, eps, log=True)
+        # Compute the Sinkhorn dual variables.
+        _, wass_log = ot.sinkhorn(
+            A[:,ii[k]].contiguous(), # This is the source histogram.
+            A[:,ii[:k+1]].contiguous(), # These are the target histograms.
+            C, # This is the gruond cost.
+            eps, # This is the entropic regularization parameter.
+            log=True # Return the dual variables.
+        )
 
-        f = eps*wass_log['u'].log()
-        g = eps*wass_log['v'].log()
+        # Compute the exponential dual variables.
+        f, g = eps*wass_log['u'].log(), eps*wass_log['v'].log()
 
-        wass = (f*A[:,[ii[k]]*(k+1)] + g*A[:,ii[:k+1]] - eps*wass_log['u']*(K@wass_log['v'])).sum(0)
+        # Compute the Sinkhorn costs.
+        # These will be used to compute the Sinkhorn divergences below.
+        wass = (
+            f*A[:,[ii[k]]*(k+1)] +
+            g*A[:,ii[:k+1]] -
+            eps*wass_log['u']*(K@wass_log['v'])
+        ).sum(0)
 
         # Add them in the distance matrix (including symmetric values).
-        D_new[ii[k],ii[:k+1]] = D_new[ii[:k+1],ii[k]] = wass#torch.Tensor(wass)
+        D_new[ii[k],ii[:k+1]] = D_new[ii[:k+1],ii[k]] = wass
     
     # Get the diagonal terms OT_eps(a, a)
     d = torch.diagonal(D_new)
@@ -379,12 +406,14 @@ def stochastic_sinkhorn_map(
     # Make sure the diagonal is zero.
     D_new.fill_diagonal_(0)
 
+    # Get the indices for the grid (ii,ii).
     xx, yy = np.meshgrid(ii, ii)
 
     # If the regularization parameter is > 0, regularize.
     if tau > 0:
         D_new[xx, yy] += tau*R[xx, yy]
     
+    # Divide by the samllest regularization.
     r = R[xx, yy]
     r = r[r > 0].min()
     D_new[xx, yy] /= r
@@ -587,7 +616,7 @@ def stochastic_wasserstein_singular_vectors(
 
         try:
 
-            # Ste the decreasing step size.
+            # Set the decreasing step size.
             step_size = 1/np.sqrt(k)
             writer.add_scalar('step_size', step_size, k)
 
