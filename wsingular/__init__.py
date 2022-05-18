@@ -158,22 +158,6 @@ def knn_error(D: torch.Tensor, k: int, labels_train: Iterable, labels_test: Iter
         float: The KNN error
     """
 
-    # Get k+1 lowest distances.
-    # _, indices = D.topk(k=k+1, dim=1, largest=False)
-
-    # # Remove the index itself (it has distance 0 of course).
-    # different_indices = []
-    # for i in range(indices.shape[0]):
-    #     idx = (indices[i] != i)
-    #     different_indices.append(indices[i, idx])
-
-    # error = []
-    # for i in range(len(labels)):
-    #     label_array = np.array(labels)[different_indices[i]]
-    #     error.append(np.mean(label_array != np.array(labels)[i]))
-    
-    # return np.mean(error), different_indices
-
     label_train_codes = pd.Categorical(labels_train).codes
     label_test_codes = pd.Categorical(labels_test).codes
 
@@ -185,8 +169,6 @@ def knn_error(D: torch.Tensor, k: int, labels_train: Iterable, labels_test: Iter
     
     acc = acc / label_test_codes.shape[0]
     return 1 - acc
-
-
 
 def viz_TSNE(
     D: torch.Tensor, labels: Iterable = None,
