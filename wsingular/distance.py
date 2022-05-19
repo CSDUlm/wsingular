@@ -10,46 +10,49 @@ def wasserstein_map(
     C: torch.Tensor,
     R: torch.Tensor,
     tau: float,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    progress_bar=False,
+    progress_bar: bool = False,
 ) -> torch.Tensor:
-    """This function maps a ground cost to the Wasserstein distance matrix on
-    a certain dataset using that ground cost. R is an added regularization.
+    """This function maps a ground cost to the Wasserstein distance matrix on a certain dataset using that ground cost. R is an added regularization.
 
     Args:
         A (torch.Tensor): The input dataset.
         C (torch.Tensor): the ground cost.
         R (torch.Tensor): The regularization matrix.
         tau (float): The regularization parameter.
-        dtype (str): The dtype.
+        dtype (torch.dtype): The dtype.
         device (str): The device.
+        progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False
 
     Returns:
         torch.Tensor: The Wasserstein distance matrix with regularization.
     """
 
     # Name the dimensions of the dataset (features x samples).
-    m, n = A.shape
+    n_features, n_samples = A.shape
 
     # Create an empty distance matrix to be populated.
-    D = torch.zeros(n, n, dtype=dtype, device=device)
+    D = torch.zeros(n_samples, n_samples, dtype=dtype, device=device)
 
+    # Initialize the progress bar, if we want one.
     if progress_bar:
-        pbar = tqdm(total=A.shape[1] * (A.shape[1] - 1) // 2, leave=False)
+        pbar = tqdm(total=n_samples * (n_samples - 1) // 2, leave=False)
 
     # Iterate over the lines.
-    for i in range(1, A.shape[1]):
+    for i in range(1, n_samples):
 
+        # Update the progress bar if it exists.
         if progress_bar:
             pbar.update(i)
 
-        # Compute the Wasserstein distances.
+        # Compute the Wasserstein distances between i,j for j < i.
         wass = ot.emd2(A[:, i].contiguous(), A[:, :i].contiguous(), C)
 
         # Add them in the distance matrix (including symmetric values).
         D[i, :i] = D[:i, i] = torch.Tensor(wass)
 
+    # Close the progress bar if it exists.
     if progress_bar:
         pbar.close()
 
@@ -67,12 +70,13 @@ def sinkhorn_map(
     R: torch.Tensor,
     tau: float,
     eps: float,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    progress_bar=False,
+    progress_bar: bool = False,
+    stop_threshold: float = 1e-5,
+    num_iter_max: int = 500,
 ) -> torch.Tensor:
-    """This function maps a ground cost to the Sinkhorn divergence matrix on
-    a certain dataset using that ground cost. R is an added regularization.
+    """This function maps a ground cost to the pairwise Sinkhorn divergence matrix on a certain dataset using that ground cost. R is an added regularization.
 
     Args:
         A (torch.Tensor): The input dataset.
@@ -80,38 +84,43 @@ def sinkhorn_map(
         R (torch.Tensor): The added regularization.
         tau (float): The regularization parameter for R.
         eps (float): The entropic regularization parameter.
-        dtype (str): The dtype.
+        dtype (torch.dtype): The dtype.
         device (str): The device.
+        progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
+        stop_threshold (float, optional): Stopping threshold for Sinkhorn (please refer to POT). Defaults to 1e-5.
+        num_iter_max (int, optional): Maximum number of Sinkhorn iterations (please refer to POT). Defaults to 500.
 
     Returns:
-        torch.Tensor: The divergence matrix.
+        torch.Tensor: The pairwise Sinkhorn divergence matrix.
     """
 
     # Name the dimensions of the dataset (features x samples).
-    m, n = A.shape
+    n_features, n_samples = A.shape
 
     # Create an empty distance matrix to be populated.
-    D = torch.zeros(n, n, dtype=dtype, device=device)
+    D = torch.zeros(n_samples, n_samples, dtype=dtype, device=device)
 
+    # Compute the kernel.
     K = (-C / eps).exp()
 
     if progress_bar:
-        pbar = tqdm(total=A.shape[1] * (A.shape[1] - 1) // 2, leave=False)
+        pbar = tqdm(total=n_samples * (n_samples - 1) // 2, leave=False)
 
-    # Iterate over the lines.
-    for i in range(A.shape[1]):
+    # Iterate over the source samples.
+    for i in range(n_samples):
 
+        # Iterate over batches of target samples.
         for ii in np.array_split(range(i + 1), max(1, i // 100)):
 
-            # Compute the Sinkhorn dual variables
+            # Compute the Sinkhorn dual variables.
             _, wass_log = ot.sinkhorn(
                 A[:, i].contiguous(),  # This is the source histogram.
                 A[:, ii].contiguous(),  # These are the target histograms.
                 C,  # This is the ground cost.
                 eps,  # This is the regularization parameter.
                 log=True,  # Return the dual variables
-                stopThr=1e-5,
-                numItermax=500,
+                stopThr=stop_threshold,
+                numItermax=num_iter_max,
             )
 
             # Compute the exponential dual potentials.
@@ -128,9 +137,11 @@ def sinkhorn_map(
             # Add them in the distance matrix (including symmetric values).
             D[i, ii] = D[ii, i] = wass
 
+            # Update the progress bar if it exists.
             if progress_bar:
                 pbar.update(len(ii))
 
+    # Close the progress bar if it exists.
     if progress_bar:
         pbar.close()
 
@@ -165,10 +176,10 @@ def stochastic_wasserstein_map(
     sample_prop: float,
     tau: float,
     gamma: float,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    progress_bar=False,
-    return_indices=False,
+    progress_bar: bool = False,
+    return_indices: bool = False,
 ) -> torch.Tensor:
     """Returns the stochastic Wasserstein map, updating only a random subset of
     indices and leaving the other ones as they are.
@@ -180,37 +191,41 @@ def stochastic_wasserstein_map(
         R (torch.Tensor): The regularization matrix.
         sample_size (int): The number of indices to update (they are symmetric)
         tau (float): The regularization parameter for R
-        dtype (str): The dtype
+        dtype (torch.dtype): The dtype
         device (str): The device
+        progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
+        return_indices (bool): Whether to return the updated indices. Defaults to False.
+        stop_threshold (float, optional): Stopping threshold for Sinkhorn (please refer to POT). Defaults to 1e-5.
+        num_iter_max (int, optional): Maximum number of Sinkhorn iterations (please refer to POT). Defaults to 500.
 
     Returns:
         torch.Tensor: The stochastically updated distance matrix.
     """
 
+    # Check that input parameters make sense.
     assert gamma > 0
     assert tau >= 0
-    # TODO assert simplex
 
     # Name the dimensions of the dataset (features x samples).
-    m, n = A.shape
+    n_features, n_features = A.shape
 
-    # Define the sample size from the proportion. TODO: Not a linear function though
-    sample_size = n
-    sample_size = max(2, int(np.sqrt(sample_prop) * sample_size))
+    # Define the sample size from the proportion.
+    sample_size = max(2, int(np.sqrt(sample_prop) * n_features))
 
-    # The indices to sample from
-    # Random indices.
-    ii = np.random.choice(range(n), size=sample_size, replace=False)
+    # The indices to sample from.
+    ii = np.random.choice(range(n_features), size=sample_size, replace=False)
 
-    # Initialize new distance
+    # Initialize a new distance matrix.
     D_new = D.clone()
 
+    # Create the progress bar if we want one.
     if progress_bar:
         pbar = tqdm(total=sample_size * (sample_size - 1) // 2, leave=False)
 
     # Iterate over random indices.
     for k in range(1, sample_size):
 
+        # Update the progress bar if we have one.
         if progress_bar:
             pbar.update(k)
 
@@ -220,9 +235,10 @@ def stochastic_wasserstein_map(
         ).to(dtype=dtype, device=device)
 
         # Add them in the distance matrix (including symmetric values).
-        # Also add regularization.
+        # Regularization will be added later.
         D_new[ii[k], ii[:k]] = D_new[ii[:k], ii[k]] = wass
 
+    # Close the progress bar if it exists.
     if progress_bar:
         pbar.close()
 
@@ -255,11 +271,11 @@ def stochastic_sinkhorn_map(
     tau: float,
     gamma: float,
     eps: float,
-    dtype: str,
-    device: str,
-    progress_bar=False,
-    return_indices=False,
-    batch_size=50,
+    progress_bar: bool = False,
+    return_indices: bool = False,
+    batch_size: int = 50,
+    stop_threshold: float = 1e-5,
+    num_iter_max: int = 100,
 ) -> torch.Tensor:
     """Returns the stochastic Sinkhorn divergence map, updating only a random
     subset of indices and leaving the other ones as they are.
@@ -271,29 +287,32 @@ def stochastic_sinkhorn_map(
         R (torch.Tensor): The regularization matrix.
         sample_size (int): The number of indices to update (they are symmetric)
         tau (float): The regularization parameter for R
+        gamma (float): Rescaling parameter. In practice, one should rescale by an approximation of the singular value.
         eps (float): The entropic regularization parameter
-        dtype (str): The dtype
-        device (str): The device
+        progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
+        return_indices (bool): Whether to return the updated indices. Defaults to False.
+        batch_size (int): Batch size, i.e. how many distances to compute at the same time. Depends on your available GPU memory. Defaults to 50.
 
     Returns:
         torch.Tensor: The stochastically updated distance matrix.
     """
 
     # Name the dimensions of the dataset (features x samples).
-    m, n = A.shape
+    n_features, n_samples = A.shape
 
-    # Define the sample size from the proportion. TODO: Not a linear function though
-    sample_size = n
-    sample_size = max(2, int(np.sqrt(sample_prop) * sample_size))
+    # Define the sample size from the proportion.
+    sample_size = max(2, int(np.sqrt(sample_prop) * n_samples))
 
     # Random indices.
-    idx = np.random.choice(range(n), size=sample_size, replace=False)
+    idx = np.random.choice(range(n_samples), size=sample_size, replace=False)
 
     # Initialize new distance
     D_new = D.clone()
 
+    # Compute the kernel.
     K = (-C / eps).exp()
 
+    # Initialize the progress bar if we want one.
     if progress_bar:
         pbar = tqdm(total=sample_size * (sample_size - 1) // 2, leave=False)
 
@@ -301,7 +320,6 @@ def stochastic_sinkhorn_map(
     for k in range(sample_size):
 
         i = idx[k]
-        # ii = idx[:k+1]
 
         for ii in np.array_split(idx[: k + 1], max(1, k // batch_size)):
 
@@ -309,11 +327,11 @@ def stochastic_sinkhorn_map(
             _, wass_log = ot.sinkhorn(
                 A[:, i].contiguous(),  # This is the source histogram.
                 A[:, ii].contiguous(),  # These are the target histograms.
-                C,  # This is the gruond cost.
+                C,  # This is the ground cost.
                 eps,  # This is the entropic regularization parameter.
                 log=True,  # Return the dual variables.
-                stopThr=1e-5,
-                numItermax=100,
+                stopThr=stop_threshold,
+                numItermax=num_iter_max,
             )
 
             # Compute the exponential dual variables.
@@ -330,9 +348,11 @@ def stochastic_sinkhorn_map(
             # Add them in the distance matrix (including symmetric values).
             D_new[i, ii] = D_new[ii, i] = wass
 
+            # Update the progress bar if we have one.
             if progress_bar:
                 pbar.update(len(ii))
 
+    # Close the progress bar if we have one.
     if progress_bar:
         pbar.close()
 
@@ -346,7 +366,7 @@ def stochastic_sinkhorn_map(
     D_new[xx, yy] = D_new[xx, yy] - 0.5 * (d.view(-1, 1) + d.view(1, -1))
 
     # Make sure there are no negative values.
-    # assert((D_new < 0).sum() == 0)
+    assert (D_new < 0).sum() == 0
 
     # Make sure the diagonal is zero.
     D_new[xx, yy].fill_diagonal_(0)
