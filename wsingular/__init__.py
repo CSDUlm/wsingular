@@ -6,7 +6,6 @@ from typing import Callable, Tuple
 import distance
 import utils
 
-
 def wasserstein_singular_vectors(
     dataset: torch.Tensor,
     tau: float,
