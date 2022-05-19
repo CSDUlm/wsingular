@@ -162,33 +162,6 @@ def silhouette(D: torch.Tensor, labels: Iterable) -> float:
     return silhouette_score(D.cpu(), labels, metric="precomputed")
 
 
-def knn_error(
-    D: torch.Tensor, k: int, labels_train: Iterable, labels_test: Iterable
-) -> float:
-    """Returns the KNN error.
-
-    Args:
-        D (torch.Tensor): Input distance matrix
-        k (int): How many neighbours
-        labels (Iterable): The labels
-
-    Returns:
-        float: The KNN error
-    """
-
-    label_train_codes = pd.Categorical(labels_train).codes
-    label_test_codes = pd.Categorical(labels_test).codes
-
-    acc = 0
-    for i in range(label_test_codes.shape[0]):
-        rank = np.argsort(D[i])
-        if np.bincount(label_train_codes[rank[:k]]).argmax() == label_test_codes[i]:
-            acc += 1
-
-    acc = acc / label_test_codes.shape[0]
-    return 1 - acc
-
-
 def viz_TSNE(
     D: torch.Tensor,
     labels: Iterable = None,
