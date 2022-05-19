@@ -6,37 +6,41 @@ from typing import Callable, Tuple
 import distance
 import utils
 
+
 def wasserstein_singular_vectors(
     dataset: torch.Tensor,
-    tau: float,
-    p: int,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    max_iter: int,
-    writer: SummaryWriter,
+    n_iter: int,
+    tau: float = 1e-3,
+    p: int = 1,
+    writer: SummaryWriter = None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
-    C_ref: torch.tensor = None,
+    C_ref: torch.Tensor = None,
     D_ref: torch.Tensor = None,
-    log_loss=False,
-    progress_bar=False,
+    log_loss: bool = False,
+    progress_bar: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Performs power iterations and return Wasserstein Singular Vectors.
+    """Performs power iterations and returns Wasserstein Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
         dataset (torch.Tensor): The input dataset
-        tau (float): The regularization parameter for the norm R.
-        p (int): The order of the norm R
-        dtype (str): The dtype.
+        dtype (str): The dtype
         device (str): The device
-        max_ter (int): The maximum number of power iterations.
-        normalization_steps (int): How many Sinkhorn iterations for the initial
-        normalization of the dataset. Must be > 1. Defaults to 1, which is just
-        regular normalization, along columns for A and along rows for B. For
-        large numbers of steps, A and B are bistochastic. TODO: check this.
+        n_iter (int): The number of power iterations.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        p (int, optional): The order of the norm R. Defaults to 1.
+        writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
+        small_value (float, optional): A small value for numerical stability. Defaults to 1e-6.
+        normalization_steps (int, optional): How many Sinkhorn iterations for the initial normalization of the dataset. Must be > 0. Defaults to 1, which is just regular normalization, along columns for A and along rows for B. For large numbers of steps, A and B are bistochastic.
+        C_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        D_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        log_loss (bool, optional): Whether to return the loss. Defaults to False.
+        progress_bar (bool, optional): Whether to display a progress bar for individual matrix computations. Defaults to False.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Wasserstein sigular vectors (C,D)
+        Tuple[torch.Tensor, torch.Tensor]: Wasserstein sigular vectors (C,D). If `log_loss`, it returns (C, D, loss_C, loss_D)
     """
 
     # Name the dimensions of the dataset.
@@ -62,9 +66,10 @@ def wasserstein_singular_vectors(
     # Initialize loss history.
     loss_C, loss_D = [], []
 
-    # Iterate until `max_iter`.
-    for n_iter in range(max_iter):
+    # Iterate until `n_iter`.
+    for k in range(n_iter):
 
+        # Try, but expect a KeyboardInterrupt in case of early stopping.
         try:
             # Compute D using C
             D_new = distance.wasserstein_map(
@@ -81,8 +86,12 @@ def wasserstein_singular_vectors(
             if writer:
                 if torch.is_tensor(D_ref):
                     loss_D.append(utils.hilbert_distance(D, D_ref))
-                    writer.add_scalar("Hilbert D,D_ref", loss_D[-1], n_iter)
-                writer.add_scalar("Hilbert D,D_new", utils.hilbert_distance(D, D_new), n_iter)
+                    writer.add_scalar("Hilbert D,D_ref", loss_D[-1], k)
+                writer.add_scalar(
+                    "Hilbert D,D_new",
+                    utils.hilbert_distance(D, D_new),
+                    k,
+                )
 
             # Normalize D
             D = D_new / D_new.max()
@@ -102,13 +111,15 @@ def wasserstein_singular_vectors(
             if writer:
                 if torch.is_tensor(C_ref):
                     loss_C.append(utils.hilbert_distance(C, C_ref))
-                    writer.add_scalar("Hilbert C,C_ref", loss_C[-1], n_iter)
-                writer.add_scalar("Hilbert C,C_new", utils.hilbert_distance(C, C_new), n_iter)
+                    writer.add_scalar("Hilbert C,C_ref", loss_C[-1], k)
+                writer.add_scalar(
+                    "Hilbert C,C_new",
+                    utils.hilbert_distance(C, C_new),
+                    k,
+                )
 
             # Normalize C
             C = C_new / C_new.max()
-
-            # TODO: Try early stopping.
 
         except KeyboardInterrupt:
             print("Stopping early after keyboard interrupt!")
@@ -124,37 +135,40 @@ def wasserstein_singular_vectors(
 
 def sinkhorn_singular_vectors(
     dataset: torch.Tensor,
-    tau: float,
-    eps: float,
-    p: int,
     dtype: str,
     device: str,
-    max_iter: int,
-    writer: SummaryWriter,
+    n_iter: int,
+    tau: float = 1e-3,
+    eps: float = 5e-2,
+    p: int = 1,
+    writer: SummaryWriter = None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
-    C_ref: torch.tensor = None,
+    C_ref: torch.Tensor = None,
     D_ref: torch.Tensor = None,
-    log_loss=False,
-    progress_bar=False,
+    log_loss: bool = False,
+    progress_bar: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Performs power iterations and return Sinkhorn Singular Vectors.
+    """Performs power iterations and returns Sinkhorn Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
         dataset (torch.Tensor): The input dataset
-        tau (float): The regularization parameter for the norm R.
-        eps (float): The entropics regularization parameter.
-        p (int): The order of the norm R
-        dtype (str): The dtype.
+        dtype (str): The dtype
         device (str): The device
-        max_ter (int): The maximum number of power iterations.
-        normalization_steps (int): How many Sinkhorn iterations for the initial
-        normalization of the dataset. Must be > 1. Defaults to 1, which is just
-        regular normalization, along columns for A and along rows for B. For
-        large numbers of steps, A and B are bistochastic. TODO: check this.
+        n_iter (int): The number of power iterations.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        eps (float): The entropic regularization parameter.
+        p (int, optional): The order of the norm R. Defaults to 1.
+        writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
+        small_value (float, optional): A small value for numerical stability. Defaults to 1e-6.
+        normalization_steps (int, optional): How many Sinkhorn iterations for the initial normalization of the dataset. Must be > 0. Defaults to 1, which is just regular normalization, along columns for A and along rows for B. For large numbers of steps, A and B are bistochastic.
+        C_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        D_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        log_loss (bool, optional): Whether to return the loss. Defaults to False.
+        progress_bar (bool, optional): Whether to display a progress bar for individual matrix computations. Defaults to False.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Sinkhorn sigular vectors (C,D)
+        Tuple[torch.Tensor, torch.Tensor]: Sinkhorn Singular Vectors (C,D). If `log_loss`, it returns (C, D, loss_C, loss_D)
     """
 
     # Name the dimensions of the dataset.
@@ -169,20 +183,20 @@ def sinkhorn_singular_vectors(
         device=device,
     )
 
-    # Initialize a random cost matrix.
-    C = utils.random_distance(m, dtype=dtype, device=device)
-    D = utils.random_distance(n, dtype=dtype, device=device)
-
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = utils.regularization_matrix(B, p=p, dtype=dtype, device=device)
 
+    D = R_A.clone()
+    C = R_B.clone()
+
     # Initialize loss history.
     loss_C, loss_D = [], []
 
-    # Iterate until `max_iter`.
-    for n_iter in range(max_iter):
+    # Iterate until `n_iter`.
+    for k in range(n_iter):
 
+        # Try, but expect a KeyboardInterrupt in case of early stopping.
         try:
 
             # Compute D using C
@@ -201,8 +215,10 @@ def sinkhorn_singular_vectors(
             if writer:
                 if torch.is_tensor(D_ref):
                     loss_D.append(utils.hilbert_distance(D, D_ref))
-                    writer.add_scalar("Hilbert D,D_ref", loss_D[-1], n_iter)
-                writer.add_scalar("Hilbert D,D_new", utils.hilbert_distance(D, D_new), n_iter)
+                    writer.add_scalar("Hilbert D,D_ref", loss_D[-1], k)
+                writer.add_scalar(
+                    "Hilbert D,D_new", utils.hilbert_distance(D, D_new), k
+                )
 
             # Normalize D
             D = D_new / D_new.max()
@@ -223,8 +239,10 @@ def sinkhorn_singular_vectors(
             if writer:
                 if torch.is_tensor(C_ref):
                     loss_C.append(utils.hilbert_distance(C, C_ref))
-                    writer.add_scalar("Hilbert C,C_ref", loss_C[-1], n_iter)
-                writer.add_scalar("Hilbert C,C_new", utils.hilbert_distance(C, C_new), n_iter)
+                    writer.add_scalar("Hilbert C,C_ref", loss_C[-1], k)
+                writer.add_scalar(
+                    "Hilbert C,C_new", utils.hilbert_distance(C, C_new), k
+                )
 
             # Normalize C
             C = C_new / C_new.max()
@@ -243,47 +261,45 @@ def sinkhorn_singular_vectors(
         return C, D
 
 
-####################### THE STOCHASTIC POWER ITERATIONS #######################
-
-
 def stochastic_wasserstein_singular_vectors(
     dataset: torch.Tensor,
-    tau: float,
-    sample_prop: float,
-    p: int,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    max_iter: int,
-    writer: SummaryWriter,
+    n_iter: int,
+    tau: float = 1e-3,
+    sample_prop: float = 1e-1,
+    p: int = 1,
+    step_fn: Callable = lambda k: 1 / np.sqrt(k),
+    mult_update: bool = False,
+    writer: SummaryWriter = None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
-    C_ref: torch.tensor = None,
+    C_ref: torch.Tensor = None,
     D_ref: torch.Tensor = None,
-    progress_bar=False,
-    step_fn: Callable = lambda k: 1 / np.sqrt(k),
-    mult_update=False,
+    progress_bar: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Performs power iterations and return Wasserstein Singular Vectors.
+    """Performs stochastic power iterations and returns Wasserstein Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
         dataset (torch.Tensor): The input dataset
-        tau (float): The regularization parameter for the norm R.
-        sample_size (int): The number of indices to update at each step.
-        p (int): The order of the norm R
-        dtype (str): The dtype.
+        dtype (torch.dtype): The dtype
         device (str): The device
-        max_ter (int): The maximum number of power iterations.
-        normalization_steps (int): How many Sinkhorn iterations for the initial
-        normalization of the dataset. Must be > 1. Defaults to 1, which is just
-        regular normalization, along columns for A and along rows for B. For
-        large numbers of steps, A and B are bistochastic. TODO: check this.
+        n_iter (int): The number of power iterations.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        sample_prop (float, optional): The proportion of indices to update at each step. Defaults to 1e-1.
+        p (int, optional): The order of the norm R. Defaults to 1.
+        step_fn (Callable, optional): The function that defines step size from the iteration number (which starts at 1). Defaults to lambdak:1/np.sqrt(k).
+        mult_update (bool, optional): If True, use multiplicative update instead of additive update. Defaults to False.
+        writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
+        small_value (float, optional): A small value for numerical stability. Defaults to 1e-6.
+        normalization_steps (int, optional): How many Sinkhorn iterations for the initial normalization of the dataset. Must be > 0. Defaults to 1, which is just regular normalization, along columns for A and along rows for B. For large numbers of steps, A and B are bistochastic.
+        C_ref (torch.tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        D_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        progress_bar (bool, optional): Whether to display a progress bar for individual matrix computations. Defaults to False.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Wasserstein sigular vectors (C,D)
+        Tuple[torch.Tensor, torch.Tensor]: Wasserstein Singular Vectors (C,D)
     """
-
-    # Name the dimensions of the dataset.
-    m, n = dataset.shape
 
     # Make the transposed datasets A and B from the dataset U.
     A, B = utils.normalize_dataset(
@@ -298,21 +314,28 @@ def stochastic_wasserstein_singular_vectors(
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = utils.regularization_matrix(B, p=p, dtype=dtype, device=device)
 
+    # Initialize the singular vectors as the regularization matrices.
     D = R_A.clone()
     C = R_B.clone()
 
+    # Initialize the approximations of the singular values. Rescaling at each iteration
+    # by the (approximated) singular value make convergence super duper fast.
     mu, lbda = 1, 1
 
-    # Iterate until `max_iter`.
-    for k in range(1, max_iter):
+    # Iterate until `n_iter`.
+    for k in range(1, n_iter):
 
+        # Try, but expect a KeyboardInterrupt in case of early stopping.
         try:
 
             # Set the decreasing step size.
             step_size = step_fn(k)
+
+            # Log the step size if there is a writer.
             if writer:
                 writer.add_scalar("step_size", step_size, k)
 
+            # Update a random subset of the indices.
             C_new, xx, yy = distance.stochastic_wasserstein_map(
                 B,
                 C,
@@ -324,32 +347,47 @@ def stochastic_wasserstein_singular_vectors(
                 dtype=dtype,
                 device=device,
                 return_indices=True,
+                progress_bar=progress_bar,
             )
 
+            # Update the approximation of the singular value lambda.
             lbda = (1 - step_size) * lbda + step_size * torch.sum(
                 C_new[xx, yy] * C[xx, yy]
             ) / torch.sum(C[xx, yy] ** 2)
 
+            # Log the approximation of lambda if there is a writer.
             if writer:
                 writer.add_scalar("lambda", lbda, k)
 
+            # Rescale the updated indices by the approximation of the singular value.
             C_new[xx, yy] /= lbda
 
+            # Update the singular vector, either multiplicatively or additively.
             if mult_update:
                 C_new = torch.exp((1 - step_size) * C.log() + step_size * C_new.log())
             else:
                 C_new = (1 - step_size) * C + step_size * C_new
 
+            # Make sure the diagonal of C is 0.
             C_new.fill_diagonal_(0)
 
+            # If we have a writer, compute some losses.
             if writer:
+
+                # If we have a reference, compute Hilbert distance to ref.
                 if torch.is_tensor(C_ref):
                     hilbert = utils.hilbert_distance(C_new, C_ref)
                     writer.add_scalar("Hilbert C,C_ref", hilbert, k)
-                writer.add_scalar("Hilbert C,C_new", utils.hilbert_distance(C, C_new), k)
 
+                # Compute the Hilbert distance to the value of C at the previous step.
+                writer.add_scalar(
+                    "Hilbert C,C_new", utils.hilbert_distance(C, C_new), k
+                )
+
+            # Rescale the singular vector.
             C = C_new / C_new.max()
 
+            # Update a random subset of the indices.
             D_new, xx, yy = distance.stochastic_wasserstein_map(
                 A,
                 D,
@@ -361,80 +399,100 @@ def stochastic_wasserstein_singular_vectors(
                 dtype=dtype,
                 device=device,
                 return_indices=True,
+                progress_bar=progress_bar,
             )
 
+            # Update the approximation of the singular value mu.
             mu = (1 - step_size) * mu + step_size * torch.sum(
                 D_new[xx, yy] * D[xx, yy]
             ) / torch.sum(D[xx, yy] ** 2)
 
+            # Log the approximation of mu if there is a writer.
             if writer:
                 writer.add_scalar("mu", mu, k)
 
+            # Rescale the updated indices by the approximation of the singular value mu.
             D_new[xx, yy] /= mu
 
+            # Update the singular vector, either multiplicatively or additively.
             if mult_update:
                 D_new = torch.exp((1 - step_size) * D.log() + step_size * D_new.log())
             else:
                 D_new = (1 - step_size) * D + step_size * D_new
 
+            # Make sure the diagonal of D is 0.
             D_new.fill_diagonal_(0)
 
+            # If we have a writer, compute some losses.
             if writer:
+
+                # If we have a reference, compute Hilbert distance to ref.
                 if torch.is_tensor(D_ref):
                     hilbert = utils.hilbert_distance(D_new, D_ref)
                     writer.add_scalar("Hilbert D,D_ref", hilbert, k)
-                writer.add_scalar("Hilbert D,D_new", utils.hilbert_distance(D, D_new), k)
 
+                # Compute the Hilbert distance to the value of C at the previous step.
+                writer.add_scalar(
+                    "Hilbert D,D_new",
+                    utils.hilbert_distance(D, D_new),
+                    k,
+                )
+
+            # Rescale the singular vector.
             D = D_new / D_new.max()
 
+        # In case of Ctrl-C, make sure C and D are rescaled properly
         except KeyboardInterrupt:
             print("Stopping early after keyboard interrupt!")
             C /= C.max()
             D /= D.max()
             break
+
+    # Return the singular vectors.
     return C, D
 
 
 def stochastic_sinkhorn_singular_vectors(
     dataset: torch.Tensor,
-    tau: float,
-    eps: float,
-    sample_prop: float,
-    p: int,
-    dtype: str,
+    dtype: torch.dtype,
     device: str,
-    max_iter: int,
-    writer: SummaryWriter,
+    n_iter: int,
+    tau: float = 1e-3,
+    eps: float = 5e-2,
+    sample_prop: float = 1e-1,
+    p: int = 1,
+    step_fn: Callable = lambda k: 1 / np.sqrt(k),
+    mult_update: bool = False,
+    writer: SummaryWriter = None,
     small_value: float = 1e-6,
-    C_ref=None,
-    D_ref=None,
     normalization_steps: int = 1,
-    step_fn: Callable = lambda k: 2 / (2 + np.sqrt(k)),
-    progress_bar=False,
-    mult_update=False,
+    C_ref: torch.Tensor = None,
+    D_ref: torch.Tensor = None,
+    progress_bar: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Performs power iterations and return Sinkhorn Singular Vectors.
+    """Performs stochastic power iterations and returns Sinkhorn Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
         dataset (torch.Tensor): The input dataset
-        tau (float): The regularization parameter for the norm R.
-        sample_size (int): The number of indices to update at each step.
-        eps (float): The entropic regularization parameter.
-        p (int): The order of the norm R
-        dtype (str): The dtype.
+        dtype (torch.dtype): The dtype
         device (str): The device
-        max_ter (int): The maximum number of power iterations.
-        normalization_steps (int): How many Sinkhorn iterations for the initial
-        normalization of the dataset. Must be > 1. Defaults to 1, which is just
-        regular normalization, along columns for A and along rows for B. For
-        large numbers of steps, A and B are bistochastic. TODO: check this.
+        n_iter (int): The number of power iterations.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        eps (float, optional): The entropic regularization parameter. Defaults to 5e-2.
+        sample_prop (float, optional): The proportion of indices to update at each step. Defaults to 1e-1.
+        p (int, optional): The order of the norm R. Defaults to 1.
+        step_fn (Callable, optional): The function that defines step size from the iteration number (which starts at 1). Defaults to lambdak:1/np.sqrt(k).
+        mult_update (bool, optional): If True, use multiplicative update instead of additive update. Defaults to False.
+        writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
+        small_value (float, optional): A small value for numerical stability. Defaults to 1e-6.
+        normalization_steps (int, optional): How many Sinkhorn iterations for the initial normalization of the dataset. Must be > 0. Defaults to 1, which is just regular normalization, along columns for A and along rows for B. For large numbers of steps, A and B are bistochastic.
+        C_ref (torch.tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        D_ref (torch.Tensor, optional): If set, Hilbert distances to this reference will be computed. Defaults to None.
+        progress_bar (bool, optional): Whether to display a progress bar for individual matrix computations. Defaults to False.
 
     Returns:
-        Tuple[torch.Tensor, torch.Tensor]: Sinkhorn sigular vectors (C,D)
+        Tuple[torch.Tensor, torch.Tensor]: Sinkhorn Singular Vectors (C,D)
     """
-
-    # Name the dimensions of the dataset.
-    m, n = dataset.shape
 
     # Make the transposed datasets A and B from the dataset U.
     A, B = utils.normalize_dataset(
@@ -445,36 +503,41 @@ def stochastic_sinkhorn_singular_vectors(
         device=device,
     )
 
-    # Initialize a random cost matrix.
-    # C = utils.random_distance(m, dtype=dtype, device=device)
-    # D = utils.random_distance(n, dtype=dtype, device=device)
-
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = utils.regularization_matrix(B, p=p, dtype=dtype, device=device)
 
+    # Initialize the singular vectors as the regularization matrices.
+    # Initialize the approximations of the singular values. Rescaling at each iteration
+    # by the (approximated) singular value make convergence super duper fast.
     D = R_A.clone()
     C = R_B.clone()
 
+    # Initialize the approximations of the singular values. Rescaling at each iteration
+    # by the (approximated) singular value make convergence super duper fast.
     mu, lbda = 1, 1
 
-    # Iterate until `max_iter`.
-    for k in range(1, max_iter):
+    # Iterate until `n_iter`.
+    for k in range(1, n_iter):
 
+        # Try, but expect a KeyboardInterrupt in case of early stopping.
         try:
 
             # Set the decreasing step size.
             step_size = step_fn(k)
+
+            # Log the step size if there is a writer.
             if writer:
                 writer.add_scalar("step_size", step_size, k)
 
+            # Update a random subset of the indices.
             C_new, xx, yy = distance.stochastic_sinkhorn_map(
                 B,
                 C,
                 D,
+                R=R_B,
                 gamma=1,
                 sample_prop=sample_prop,
-                R=R_B,
                 tau=tau,
                 eps=eps,
                 dtype=dtype,
@@ -483,37 +546,52 @@ def stochastic_sinkhorn_singular_vectors(
                 progress_bar=progress_bar,
             )
 
+            # Update the approximation of the singular value lambda.
             lbda = (1 - step_size) * lbda + step_size * torch.sum(
                 C_new[xx, yy] * C[xx, yy]
             ) / torch.sum(C[xx, yy] ** 2)
 
+            # Log the approximation of lambda if there is a writer.
             if writer:
                 writer.add_scalar("lambda", lbda, k)
 
+            # Rescale the updated indices by the approximation of the singular value.
             C_new[xx, yy] /= lbda
 
+            # Update the singular vector, either multiplicatively or additively.
             if mult_update:
                 C_new = torch.exp((1 - step_size) * C.log() + step_size * C_new.log())
             else:
                 C_new = (1 - step_size) * C + step_size * C_new
 
+            # Make sure the diagonal of C is 0.
             C_new.fill_diagonal_(0)
 
+            # If we have a writer, compute some losses.
             if writer:
+                # If we have a reference, compute Hilbert distance to ref.
                 if torch.is_tensor(C_ref):
                     hilbert = utils.hilbert_distance(C_new, C_ref)
                     writer.add_scalar("Hilbert C,C_ref", hilbert, k)
-                writer.add_scalar("Hilbert C,C_new", utils.hilbert_distance(C, C_new), k)
 
+                # Compute the Hilbert distance to the value of C at the previous step.
+                writer.add_scalar(
+                    "Hilbert C,C_new",
+                    utils.hilbert_distance(C, C_new),
+                    k,
+                )
+
+            # Rescale the singular vector.
             C = C_new / C_new.max()
 
+            # Update a random subset of the indices.
             D_new, xx, yy = distance.stochastic_sinkhorn_map(
                 A,
                 D,
                 C,
+                R=R_A,
                 gamma=1,
                 sample_prop=sample_prop,
-                R=R_A,
                 tau=tau,
                 eps=eps,
                 dtype=dtype,
@@ -522,30 +600,45 @@ def stochastic_sinkhorn_singular_vectors(
                 progress_bar=progress_bar,
             )
 
+            # Update the approximation of the singular value mu.
             mu = (1 - step_size) * mu + step_size * torch.sum(
                 D_new[xx, yy] * D[xx, yy]
             ) / torch.sum(D[xx, yy] ** 2)
 
+            # Log the approximation of mu if there is a writer.
             if writer:
                 writer.add_scalar("mu", mu, k)
 
+            # Rescale the updated indices by the approximation of the singular value mu.
             D_new[xx, yy] /= mu
 
+            # Update the singular vector, either multiplicatively or additively.
             if mult_update:
                 D_new = torch.exp((1 - step_size) * D.log() + step_size * D_new.log())
             else:
                 D_new = (1 - step_size) * D + step_size * D_new
 
+            # Make sure the diagonal of D is 0.
             D_new.fill_diagonal_(0)
 
+            # If we have a writer, compute some losses.
             if writer:
+
+                # If we have a reference, compute Hilbert distance to ref.
                 if torch.is_tensor(D_ref):
                     hilbert = utils.hilbert_distance(D_new, D_ref)
                     writer.add_scalar("Hilbert D,D_ref", hilbert, k)
-                writer.add_scalar("Hilbert D,D_new", utils.hilbert_distance(D, D_new), k)
 
+                # Compute the Hilbert distance to the value of C at the previous step.
+                writer.add_scalar(
+                    "Hilbert D,D_new",
+                    utils.hilbert_distance(D, D_new),
+                    k,
+                )
+            # Rescale the singular vector.
             D = D_new / D_new.max()
 
+        # In case of Ctrl-C, make sure C and D are rescaled properly
         except KeyboardInterrupt:
             print("Stopping early after keyboard interrupt!")
             C /= C.max()
