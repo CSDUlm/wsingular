@@ -64,6 +64,12 @@ def hilbert_distance(D_1: torch.Tensor, D_2: torch.Tensor) -> float:
     Returns:
         float: The distance
     """
+
+    # Perform some sanity checks.
+    assert torch.sum(D_1 < 0) == 0 # positivity
+    assert torch.sum(D_2 < 0) == 0 # positivity
+    assert D_1.shape == D_2.shape # same shape
+
     # Get a mask of all indices except the diagonal.
     idx = torch.eye(D_1.shape[0]) != 1
 
@@ -92,8 +98,11 @@ def normalize_dataset(
         Tuple[torch.Tensor, torch.Tensor]: The normalized matrices A and B.
     """
 
-    # Check that `normalization_steps` > 0:
-    assert normalization_steps > 0
+    # Perform some sanity checks.
+    assert len(dataset.shape) == 2 # correct shape
+    assert torch.sum(dataset < 0) == 0 # positivity
+    assert small_value > 0 # a positive numerical offset
+    assert normalization_steps > 0 # normalizing at least once
 
     # Do a first normalization pass for A
     A = dataset / dataset.sum(0)
@@ -134,6 +143,11 @@ def silhouette(D: torch.Tensor, labels: Iterable) -> float:
     Returns:
         float: The average silhouette score
     """
+
+    # Perform some sanity checks.
+    assert len(D.shape) == 2 # correct shape
+    assert torch.sum(D < 0) == 0 # positivity
+    
     return silhouette_score(D.cpu(), labels, metric="precomputed")
 
 
@@ -144,6 +158,11 @@ def viz_TSNE(D: torch.Tensor, labels: Iterable = None) -> None:
         D (torch.Tensor): Distance matrix
         labels (Iterable, optional): The labels, if any. Defaults to None.
     """
+
+    # Perform some sanity checks.
+    assert len(D.shape) == 2 # correct shape
+    assert torch.sum(D < 0) == 0 # positivity
+    assert D.shape[1] == len(labels) # maching labels
 
     # Define the t-SNE model.
     tsne = TSNE(

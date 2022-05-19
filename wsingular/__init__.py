@@ -43,8 +43,14 @@ def wasserstein_singular_vectors(
         Tuple[torch.Tensor, torch.Tensor]: Wasserstein sigular vectors (C,D). If `log_loss`, it returns (C, D, loss_C, loss_D)
     """
 
-    # Name the dimensions of the dataset.
-    m, n = dataset.shape
+    # Perform some sanity checks.
+    assert len(dataset.shape) == 2 # correct shape
+    assert torch.sum(dataset < 0) == 0 # positivity
+    assert n_iter > 0 # at least one iteration
+    assert tau >= 0 # a positive regularization
+    assert p > 0 # a valid norm
+    assert small_value > 0 # a positive numerical offset
+    assert normalization_steps > 0 # normalizing at least once
 
     # Make the transposed datasets A and B from the dataset.
     A, B = utils.normalize_dataset(
@@ -55,13 +61,12 @@ def wasserstein_singular_vectors(
         device=device,
     )
 
-    # Initialize a random cost matrix.
-    C = utils.random_distance(m, dtype=dtype, device=device)
-    D = utils.random_distance(n, dtype=dtype, device=device)
-
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
     R_B = utils.regularization_matrix(B, p=p, dtype=dtype, device=device)
+
+    D = R_A.clone()
+    C = R_B.clone()
 
     # Initialize loss history.
     loss_C, loss_D = [], []
@@ -171,8 +176,15 @@ def sinkhorn_singular_vectors(
         Tuple[torch.Tensor, torch.Tensor]: Sinkhorn Singular Vectors (C,D). If `log_loss`, it returns (C, D, loss_C, loss_D)
     """
 
-    # Name the dimensions of the dataset.
-    m, n = dataset.shape
+    # Perform some sanity checks.
+    assert len(dataset.shape) == 2 # correct shape
+    assert torch.sum(dataset < 0) == 0 # positivity
+    assert n_iter > 0 # at least one iteration
+    assert tau >= 0 # a positive regularization
+    assert eps >= 0 # a positive entropic regularization
+    assert p > 0 # a valid norm
+    assert small_value > 0 # a positive numerical offset
+    assert normalization_steps > 0 # normalizing at least once
 
     # Make the transposed datasets A and B from the dataset U.
     A, B = utils.normalize_dataset(
@@ -300,6 +312,16 @@ def stochastic_wasserstein_singular_vectors(
     Returns:
         Tuple[torch.Tensor, torch.Tensor]: Wasserstein Singular Vectors (C,D)
     """
+
+    # Perform some sanity checks.
+    assert len(dataset.shape) == 2 # correct shape
+    assert torch.sum(dataset < 0) == 0 # positivity
+    assert n_iter > 0 # at least one iteration
+    assert tau >= 0 # a positive regularization
+    assert 0 < sample_prop <= 1 # a valid proportion
+    assert p > 0 # a valid norm
+    assert small_value > 0 # a positive numerical offset
+    assert normalization_steps > 0 # normalizing at least once
 
     # Make the transposed datasets A and B from the dataset U.
     A, B = utils.normalize_dataset(
@@ -493,6 +515,17 @@ def stochastic_sinkhorn_singular_vectors(
     Returns:
         Tuple[torch.Tensor, torch.Tensor]: Sinkhorn Singular Vectors (C,D)
     """
+
+    # Perform some sanity checks.
+    assert len(dataset.shape) == 2 # correct shape
+    assert torch.sum(dataset < 0) == 0 # positivity
+    assert n_iter > 0 # at least one iteration
+    assert tau >= 0 # a positive regularization
+    assert 0 < sample_prop <= 1 # a valid proportion
+    assert eps >= 0 # a positive entropic regularization
+    assert p > 0 # a valid norm
+    assert small_value > 0 # a positive numerical offset
+    assert normalization_steps > 0 # normalizing at least once
 
     # Make the transposed datasets A and B from the dataset U.
     A, B = utils.normalize_dataset(

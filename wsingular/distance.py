@@ -29,6 +29,9 @@ def wasserstein_map(
         torch.Tensor: The Wasserstein distance matrix with regularization.
     """
 
+    # Perform some sanity checks.
+    assert tau >= 0 # a positive regularization
+
     # Name the dimensions of the dataset (features x samples).
     n_features, n_samples = A.shape
 
@@ -93,6 +96,10 @@ def sinkhorn_map(
     Returns:
         torch.Tensor: The pairwise Sinkhorn divergence matrix.
     """
+
+    # Perform some sanity checks.
+    assert tau >= 0 # a positive regularization
+    assert eps >= 0 # a positive entropic regularization
 
     # Name the dimensions of the dataset (features x samples).
     n_features, n_samples = A.shape
@@ -202,6 +209,10 @@ def stochastic_wasserstein_map(
         torch.Tensor: The stochastically updated distance matrix.
     """
 
+    # Perform some sanity checks.
+    assert tau >= 0 # a positive regularization
+    assert 0 < sample_prop <= 1 # a valid proportion
+
     # Check that input parameters make sense.
     assert gamma > 0
     assert tau >= 0
@@ -296,6 +307,11 @@ def stochastic_sinkhorn_map(
     Returns:
         torch.Tensor: The stochastically updated distance matrix.
     """
+
+    # Perform some sanity checks.
+    assert tau >= 0 # a positive regularization
+    assert 0 < sample_prop <= 1 # a valid proportion
+    assert eps >= 0 # a positive entropic regularization
 
     # Name the dimensions of the dataset (features x samples).
     n_features, n_samples = A.shape
