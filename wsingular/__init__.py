@@ -3,8 +3,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 import numpy as np
 from typing import Callable, Tuple
-import distance
-import utils
+from wsingular import distance
+from wsingular import utils
 
 
 def wasserstein_singular_vectors(
@@ -573,8 +573,6 @@ def stochastic_sinkhorn_singular_vectors(
                 sample_prop=sample_prop,
                 tau=tau,
                 eps=eps,
-                dtype=dtype,
-                device=device,
                 return_indices=True,
                 progress_bar=progress_bar,
             )
@@ -627,8 +625,6 @@ def stochastic_sinkhorn_singular_vectors(
                 sample_prop=sample_prop,
                 tau=tau,
                 eps=eps,
-                dtype=dtype,
-                device=device,
                 return_indices=True,
                 progress_bar=progress_bar,
             )
