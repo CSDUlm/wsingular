@@ -2,3 +2,4 @@
 
 # Wasserstein Singular Vectors
 
+ICML 2022
