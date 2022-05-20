@@ -1,0 +1,5 @@
+torch
+scipy
+tqdm
+numpy
+pot>=0.8
