@@ -1,4 +1,9 @@
 torch
+tensorboard
+pandas
+sklearn
+seaborn
+matplotlib
 scipy
 tqdm
 numpy
