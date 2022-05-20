@@ -38,7 +38,7 @@ def regularization_matrix(
     dtype: str,
     device: str,
 ) -> torch.Tensor:
-    """Return the regularization matrix [|a_i - a_j|_p]_ij
+    """Return the regularization matrix
 
     Args:
         A (torch.Tensor): The dataset, with samples as columns
