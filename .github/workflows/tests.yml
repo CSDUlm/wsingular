@@ -36,3 +36,5 @@ jobs:
         coverage run --source=wsingular -m pytest
     - name: Upload Coverage to Codecov
       uses: codecov/codecov-action@v2
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
