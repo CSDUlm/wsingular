@@ -50,7 +50,7 @@ def wasserstein_map(
             pbar.update(i)
 
         # Compute the Wasserstein distances between i,j for j < i.
-        wass = ot.emd2(A[i].contiguous(), A[:i].contiguous(), C)
+        wass = ot.emd2(A[i].contiguous(), A[:i].T.contiguous(), C)
 
         # Add them in the distance matrix (including symmetric values).
         D[i, :i] = D[:i, i] = torch.Tensor(wass)
@@ -122,7 +122,7 @@ def sinkhorn_map(
             # Compute the Sinkhorn dual variables.
             _, wass_log = ot.sinkhorn(
                 A[i].contiguous(),  # This is the source histogram.
-                A[ii].contiguous(),  # These are the target histograms.
+                A[ii].T.contiguous(),  # These are the target histograms.
                 C,  # This is the ground cost.
                 eps,  # This is the regularization parameter.
                 log=True,  # Return the dual variables
@@ -243,7 +243,7 @@ def stochastic_wasserstein_map(
 
         # Compute the Wasserstein distances.
         wass = torch.Tensor(
-            ot.emd2(A[ii[k]].contiguous(), A[ii[:k]].contiguous(), C)
+            ot.emd2(A[ii[k]].contiguous(), A[ii[:k]].T.contiguous(), C)
         ).to(dtype=dtype, device=device)
 
         # Add them in the distance matrix (including symmetric values).
@@ -343,7 +343,7 @@ def stochastic_sinkhorn_map(
             # Compute the Sinkhorn dual variables.
             _, wass_log = ot.sinkhorn(
                 A[i].contiguous(),  # This is the source histogram.
-                A[ii].contiguous(),  # These are the target histograms.
+                A[ii].T.contiguous(),  # These are the target histograms.
                 C,  # This is the ground cost.
                 eps,  # This is the entropic regularization parameter.
                 log=True,  # Return the dual variables.
