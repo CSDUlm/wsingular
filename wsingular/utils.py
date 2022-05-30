@@ -6,6 +6,9 @@ from sklearn.metrics import silhouette_score
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
+import ot
+from sknetwork.topology import get_connected_components
 
 
 def random_distance(size: int, dtype: str, device: str) -> torch.Tensor:
@@ -66,9 +69,9 @@ def hilbert_distance(D_1: torch.Tensor, D_2: torch.Tensor) -> float:
     """
 
     # Perform some sanity checks.
-    assert torch.sum(D_1 < 0) == 0 # positivity
-    assert torch.sum(D_2 < 0) == 0 # positivity
-    assert D_1.shape == D_2.shape # same shape
+    assert torch.sum(D_1 < 0) == 0  # positivity
+    assert torch.sum(D_2 < 0) == 0  # positivity
+    assert D_1.shape == D_2.shape  # same shape
 
     # Get a mask of all indices except the diagonal.
     idx = torch.eye(D_1.shape[0]) != 1
@@ -99,10 +102,10 @@ def normalize_dataset(
     """
 
     # Perform some sanity checks.
-    assert len(dataset.shape) == 2 # correct shape
-    assert torch.sum(dataset < 0) == 0 # positivity
-    assert small_value > 0 # a positive numerical offset
-    assert normalization_steps > 0 # normalizing at least once
+    assert len(dataset.shape) == 2  # correct shape
+    assert torch.sum(dataset < 0) == 0  # positivity
+    assert small_value > 0  # a positive numerical offset
+    assert normalization_steps > 0  # normalizing at least once
 
     # Do a first normalization pass for A
     A = dataset / dataset.sum(0)
@@ -126,11 +129,59 @@ def check_uniqueness(
     B: torch.Tensor,
     C: torch.Tensor,
     D: torch.Tensor,
-    dtype: str,
-    device: str,
 ) -> bool:
-    # TODO: check uniqueness
-    pass
+    """Check uniqueness of singular vectors using the graph connectivity criterion described in the paper. Caution: transport plans such that the graph is connected might exist even if this returns False. If you want to check uniqueness, consider mointoring the Hilbert distance between several outcomes of the power iterations.
+
+    Args:
+        A (torch.Tensor): The samples.
+        B (torch.Tensor): The features.
+        C (torch.Tensor): The ground cost.
+        D (torch.Tensor): The pairwise distance.
+
+    Returns:
+        bool: Whether the criterion is verified. Caution, this might be a False negative because we do not check all possible transport plans.
+    """    
+
+    # Get the shapes of pairwise distance matrices.
+    m, n = C.shape[0], D.shape[0]
+
+    # Initialize the directed adjacency matrix.
+    adj = np.zeros((m * m + n * n, m * m + n * n))
+
+    # Iterate over samples.
+    for i in range(n):
+        for j in range(i + 1):
+
+            # Compute the transport plan between these samples.
+            P = ot.emd(A[:, i].contiguous(), A[:, j].contiguous(), C)
+
+            # Iterate over features.
+            for k in range(m):
+                for l in range(m):
+
+                    # Fill the adjacency matrix.
+                    adj[k * m + l, m * m + i * n + j] = P[k, l]
+                    adj[k * m + l, m * m + j * n + i] = P[k, l]
+
+    # Iterate over features.
+    for k in range(m):
+        for l in range(k + 1):
+
+            # Compute the transport plan between these features.
+            P = ot.emd(B[:, k].contiguous(), B[:, l].contiguous(), D)
+
+            # Iterate over samples.
+            for i in range(n):
+                for j in range(n):
+
+                    # Fill the adjacency matrix.
+                    adj[m * m + i * n + j, k * m + l] = P[i, j]
+                    adj[m * m + i * n + j, l * m + m] = P[i, j]
+
+    # Check if the graph is connected.
+    weak_labels = get_connected_components(adj, connection="weak")
+
+    return len(np.unique(weak_labels)) == 1
 
 
 def silhouette(D: torch.Tensor, labels: Iterable) -> float:
@@ -145,9 +196,9 @@ def silhouette(D: torch.Tensor, labels: Iterable) -> float:
     """
 
     # Perform some sanity checks.
-    assert len(D.shape) == 2 # correct shape
-    assert torch.sum(D < 0) == 0 # positivity
-    
+    assert len(D.shape) == 2  # correct shape
+    assert torch.sum(D < 0) == 0  # positivity
+
     return silhouette_score(D.cpu(), labels, metric="precomputed")
 
 
@@ -160,9 +211,9 @@ def viz_TSNE(D: torch.Tensor, labels: Iterable = None) -> None:
     """
 
     # Perform some sanity checks.
-    assert len(D.shape) == 2 # correct shape
-    assert torch.sum(D < 0) == 0 # positivity
-    assert D.shape[1] == len(labels) # maching labels
+    assert len(D.shape) == 2  # correct shape
+    assert torch.sum(D < 0) == 0  # positivity
+    assert D.shape[1] == len(labels)  # maching labels
 
     # Define the t-SNE model.
     tsne = TSNE(
