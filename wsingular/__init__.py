@@ -25,7 +25,7 @@ def wasserstein_singular_vectors(
     """Performs power iterations and returns Wasserstein Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
-        dataset (torch.Tensor): The input dataset
+        dataset (torch.Tensor): The input dataset, rows as samples
         dtype (str): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
