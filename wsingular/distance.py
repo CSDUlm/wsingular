@@ -17,7 +17,7 @@ def wasserstein_map(
     """This function maps a ground cost to the Wasserstein distance matrix on a certain dataset using that ground cost. R is an added regularization.
 
     Args:
-        A (torch.Tensor): The input dataset.
+        A (torch.Tensor): The input dataset, rows as samples.
         C (torch.Tensor): the ground cost.
         R (torch.Tensor): The regularization matrix.
         tau (float): The regularization parameter.
@@ -32,8 +32,8 @@ def wasserstein_map(
     # Perform some sanity checks.
     assert tau >= 0 # a positive regularization
 
-    # Name the dimensions of the dataset (features x samples).
-    n_features, n_samples = A.shape
+    # Name the dimensions of the dataset (samples x features).
+    n_samples, n_features = A.shape
 
     # Create an empty distance matrix to be populated.
     D = torch.zeros(n_samples, n_samples, dtype=dtype, device=device)
@@ -50,7 +50,7 @@ def wasserstein_map(
             pbar.update(i)
 
         # Compute the Wasserstein distances between i,j for j < i.
-        wass = ot.emd2(A[:, i].contiguous(), A[:, :i].contiguous(), C)
+        wass = ot.emd2(A[i].contiguous(), A[:i].contiguous(), C)
 
         # Add them in the distance matrix (including symmetric values).
         D[i, :i] = D[:i, i] = torch.Tensor(wass)
@@ -82,7 +82,7 @@ def sinkhorn_map(
     """This function maps a ground cost to the pairwise Sinkhorn divergence matrix on a certain dataset using that ground cost. R is an added regularization.
 
     Args:
-        A (torch.Tensor): The input dataset.
+        A (torch.Tensor): The input dataset, rows as samples.
         C (torch.Tensor): The ground cost.
         R (torch.Tensor): The added regularization.
         tau (float): The regularization parameter for R.
@@ -101,8 +101,8 @@ def sinkhorn_map(
     assert tau >= 0 # a positive regularization
     assert eps >= 0 # a positive entropic regularization
 
-    # Name the dimensions of the dataset (features x samples).
-    n_features, n_samples = A.shape
+    # Name the dimensions of the dataset (samples x features).
+    n_samples, n_features = A.shape
 
     # Create an empty distance matrix to be populated.
     D = torch.zeros(n_samples, n_samples, dtype=dtype, device=device)
@@ -121,8 +121,8 @@ def sinkhorn_map(
 
             # Compute the Sinkhorn dual variables.
             _, wass_log = ot.sinkhorn(
-                A[:, i].contiguous(),  # This is the source histogram.
-                A[:, ii].contiguous(),  # These are the target histograms.
+                A[i].contiguous(),  # This is the source histogram.
+                A[ii].contiguous(),  # These are the target histograms.
                 C,  # This is the ground cost.
                 eps,  # This is the regularization parameter.
                 log=True,  # Return the dual variables
@@ -136,8 +136,8 @@ def sinkhorn_map(
             # Compute the Sinkhorn costs.
             # These will be used to compute the Sinkhorn divergences
             wass = (
-                f * A[:, [i] * len(ii)]
-                + g * A[:, ii]
+                f * A[[i] * len(ii)]
+                + g * A[ii]
                 - eps * wass_log["u"] * (K @ wass_log["v"])
             ).sum(0)
 
@@ -196,8 +196,9 @@ def stochastic_wasserstein_map(
         D (torch.Tensor): The intialization of the distance matrix
         C (torch.Tensor): The ground cost
         R (torch.Tensor): The regularization matrix.
-        sample_size (int): The number of indices to update (they are symmetric)
+        sample_prop (float): The proportion of indices to update
         tau (float): The regularization parameter for R
+        gamma (float): A scaling factor
         dtype (torch.dtype): The dtype
         device (str): The device
         progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
@@ -217,24 +218,24 @@ def stochastic_wasserstein_map(
     assert gamma > 0
     assert tau >= 0
 
-    # Name the dimensions of the dataset (features x samples).
-    n_features, n_features = A.shape
+    # Name the dimensions of the dataset (samples x features).
+    n_samples, n_features = A.shape
 
     # Define the sample size from the proportion.
-    sample_size = max(2, int(np.sqrt(sample_prop) * n_features))
+    sampling_size = max(2, int(np.sqrt(sample_prop) * n_samples))
 
     # The indices to sample from.
-    ii = np.random.choice(range(n_features), size=sample_size, replace=False)
+    ii = np.random.choice(range(n_samples), size=sampling_size, replace=False)
 
     # Initialize a new distance matrix.
     D_new = D.clone()
 
     # Create the progress bar if we want one.
     if progress_bar:
-        pbar = tqdm(total=sample_size * (sample_size - 1) // 2, leave=False)
+        pbar = tqdm(total=sampling_size * (sampling_size - 1) // 2, leave=False)
 
     # Iterate over random indices.
-    for k in range(1, sample_size):
+    for k in range(1, sampling_size):
 
         # Update the progress bar if we have one.
         if progress_bar:
@@ -242,7 +243,7 @@ def stochastic_wasserstein_map(
 
         # Compute the Wasserstein distances.
         wass = torch.Tensor(
-            ot.emd2(A[:, ii[k]].contiguous(), A[:, ii[:k]].contiguous(), C)
+            ot.emd2(A[ii[k]].contiguous(), A[ii[:k]].contiguous(), C)
         ).to(dtype=dtype, device=device)
 
         # Add them in the distance matrix (including symmetric values).
@@ -296,7 +297,7 @@ def stochastic_sinkhorn_map(
         D (torch.Tensor): The intialization of the distance matrix
         C (torch.Tensor): The ground cost
         R (torch.Tensor): The regularization matrix.
-        sample_size (int): The number of indices to update (they are symmetric)
+        sample_prop (float): The proportion of indices to update
         tau (float): The regularization parameter for R
         gamma (float): Rescaling parameter. In practice, one should rescale by an approximation of the singular value.
         eps (float): The entropic regularization parameter
@@ -313,14 +314,14 @@ def stochastic_sinkhorn_map(
     assert 0 < sample_prop <= 1 # a valid proportion
     assert eps >= 0 # a positive entropic regularization
 
-    # Name the dimensions of the dataset (features x samples).
-    n_features, n_samples = A.shape
+    # Name the dimensions of the dataset (samples x features).
+    n_samples, n_features = A.shape
 
     # Define the sample size from the proportion.
-    sample_size = max(2, int(np.sqrt(sample_prop) * n_samples))
+    sampling_size = max(2, int(np.sqrt(sample_prop) * n_samples))
 
     # Random indices.
-    idx = np.random.choice(range(n_samples), size=sample_size, replace=False)
+    idx = np.random.choice(range(n_samples), size=sampling_size, replace=False)
 
     # Initialize new distance
     D_new = D.clone()
@@ -330,10 +331,10 @@ def stochastic_sinkhorn_map(
 
     # Initialize the progress bar if we want one.
     if progress_bar:
-        pbar = tqdm(total=sample_size * (sample_size - 1) // 2, leave=False)
+        pbar = tqdm(total=sampling_size * (sampling_size - 1) // 2, leave=False)
 
     # Iterate over random indices.
-    for k in range(sample_size):
+    for k in range(sampling_size):
 
         i = idx[k]
 
@@ -341,8 +342,8 @@ def stochastic_sinkhorn_map(
 
             # Compute the Sinkhorn dual variables.
             _, wass_log = ot.sinkhorn(
-                A[:, i].contiguous(),  # This is the source histogram.
-                A[:, ii].contiguous(),  # These are the target histograms.
+                A[i].contiguous(),  # This is the source histogram.
+                A[ii].contiguous(),  # These are the target histograms.
                 C,  # This is the ground cost.
                 eps,  # This is the entropic regularization parameter.
                 log=True,  # Return the dual variables.
@@ -356,8 +357,8 @@ def stochastic_sinkhorn_map(
             # Compute the Sinkhorn costs.
             # These will be used to compute the Sinkhorn divergences below.
             wass = (
-                f * A[:, [i] * len(ii)]
-                + g * A[:, ii]
+                f * A[[i] * len(ii)]
+                + g * A[ii]
                 - eps * wass_log["u"] * (K @ wass_log["v"])
             ).sum(0)
 
