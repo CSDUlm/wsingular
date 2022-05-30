@@ -44,7 +44,7 @@ def regularization_matrix(
     """Return the regularization matrix
 
     Args:
-        A (torch.Tensor): The dataset, with samples as columns
+        A (torch.Tensor): The dataset, with samples as rows
         p (int): order of the norm
         dtype (str): The dtype to be returned
         device (str): The device to be returned
@@ -53,8 +53,8 @@ def regularization_matrix(
         torch.Tensor: The regularization matrix
     """
 
-    # Return the pariwise distances using torch's `cdist`.
-    return torch.cdist(A.T, A.T, p=p).to(dtype=dtype, device=device)
+    # Return the pairwise distances using torch's `cdist`.
+    return torch.cdist(A, A, p=p).to(dtype=dtype, device=device)
 
 
 def hilbert_distance(D_1: torch.Tensor, D_2: torch.Tensor) -> float:
@@ -93,7 +93,7 @@ def normalize_dataset(
     """Normalize the dataset and return the normalized dataset A and the transposed dataset B.
 
     Args:
-        dataset (torch.Tensor): The input dataset.
+        dataset (torch.Tensor): The input dataset, samples as rows.
         normalization_steps (int, optional): The number of Sinkhorn normalization steps. For large numbers, we get bistochastic matrices. Defaults to 1 and should be larger or equal to 1.
         small_value (float): Small addition to the dataset to avoid numerical errors while computing OT distances. Defaults to 1e-6.
 
@@ -108,18 +108,18 @@ def normalize_dataset(
     assert normalization_steps > 0  # normalizing at least once
 
     # Do a first normalization pass for A
-    A = dataset / dataset.sum(0)
+    A = dataset / dataset.sum(1).reshape(-1, 1)
     A += small_value
-    A /= A.sum(0)
+    A = A.sum(1).reshape(-1, 1)
 
     # Do a first normalization pass for B
-    B = dataset.T / dataset.T.sum(0)
+    B = dataset.T / dataset.T.sum(1).reshape(-1, 1)
     B += small_value
-    B /= B.sum(0)
+    B /= B.sum(1).reshape(-1, 1)
 
     # Make any additional normalization steps.
     for _ in range(normalization_steps - 1):
-        A, B = B.T / B.T.sum(0), A.T / A.T.sum(0)
+        A, B = B.T / B.T.sum(1).reshape(-1, 1), A.T / A.T.sum(1).reshape(-1, 1)
 
     return A.to(dtype=dtype, device=device), B.to(dtype=dtype, device=device)
 
@@ -140,7 +140,7 @@ def check_uniqueness(
 
     Returns:
         bool: Whether the criterion is verified. Caution, this might be a False negative because we do not check all possible transport plans.
-    """    
+    """
 
     # Get the shapes of pairwise distance matrices.
     m, n = C.shape[0], D.shape[0]
@@ -153,7 +153,7 @@ def check_uniqueness(
         for j in range(i + 1):
 
             # Compute the transport plan between these samples.
-            P = ot.emd(A[:, i].contiguous(), A[:, j].contiguous(), C)
+            P = ot.emd(A[i].contiguous(), A[j].contiguous(), C)
 
             # Iterate over features.
             for k in range(m):
@@ -168,7 +168,7 @@ def check_uniqueness(
         for l in range(k + 1):
 
             # Compute the transport plan between these features.
-            P = ot.emd(B[:, k].contiguous(), B[:, l].contiguous(), D)
+            P = ot.emd(B[k].contiguous(), B[l].contiguous(), D)
 
             # Iterate over samples.
             for i in range(n):
