@@ -13,14 +13,14 @@ n_samples = 15
 n_features = 20
 
 # Initialize an empty dataset.
-dataset = torch.zeros((n_features, n_samples), dtype=dtype)
+dataset = torch.zeros((n_samples, n_features), dtype=dtype)
 
 # Iterate over the features and samples.
-for i in range(n_features):
-    for j in range(n_samples):
+for i in range(n_samples):
+    for j in range(n_features):
 
         # Fill the dataset with translated histograms.
-        dataset[i, j] = i / n_features - j / n_samples
+        dataset[i, j] = i / n_samples - j / n_features
         dataset[i, j] = torch.abs(dataset[i, j] % 1)
 
 # Take the distance to 0 on the torus.
