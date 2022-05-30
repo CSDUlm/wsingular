@@ -110,7 +110,7 @@ def normalize_dataset(
     # Do a first normalization pass for A
     A = dataset / dataset.sum(1).reshape(-1, 1)
     A += small_value
-    A = A.sum(1).reshape(-1, 1)
+    A /= A.sum(1).reshape(-1, 1)
 
     # Do a first normalization pass for B
     B = dataset.T / dataset.T.sum(1).reshape(-1, 1)
