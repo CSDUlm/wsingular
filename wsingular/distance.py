@@ -357,8 +357,8 @@ def stochastic_sinkhorn_map(
             # Compute the Sinkhorn costs.
             # These will be used to compute the Sinkhorn divergences below.
             wass = (
-                f * A[[i] * len(ii)]
-                + g * A[ii]
+                f * A[[i] * len(ii)].T
+                + g * A[ii].T
                 - eps * wass_log["u"] * (K @ wass_log["v"])
             ).sum(0)
 
