@@ -38,9 +38,6 @@ Wasserstein Singular Vectors
 .. |Documentation Status| image:: https://readthedocs.org/projects/wsingular/badge/?version=latest
    :target: https://wsingular.readthedocs.io/en/latest/?badge=latest
 
-Wasserstein Singular Vectors
-============================
-
 .. raw:: html
 
    <br>
