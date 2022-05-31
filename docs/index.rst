@@ -61,6 +61,12 @@ Install the package: :code:`pip install wsingular`
 
 Follow the tutorials in this documentation, and if you run into issue, leave an issue on the :ref:`Github repo<https://github.com/gjhuizing/wsingular>`.
 
+Tips
+-------
+
+- We strongly encourage :code:`torch.double` precision for numerical stability.
+- You can easily run the demo notebook in Google Colab! Just use 'open from Github' and add :code:`!pip install wsingular` at the beginning.
+
 Citing us
 ---------
 
