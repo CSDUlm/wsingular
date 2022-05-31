@@ -16,7 +16,19 @@ import sys
 # sys.path.insert(0, os.path.abspath('..'))
 sys.path.append(os.path.abspath(os.path.join(__file__, "../../")))
 
-autodoc_mock_imports = ["distance", "utils"]
+autodoc_mock_imports = [
+    "torch",
+    "tensorboard",
+    "pandas",
+    "sklearn",
+    "seaborn",
+    "matplotlib",
+    "scipy",
+    "tqdm",
+    "numpy",
+    "ot",
+    "sknetwork",
+]
 
 # -- Project information -----------------------------------------------------
 
