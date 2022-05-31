@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="wsingular",
-    version="0.1.3",
+    version="0.1.4",
     description="Wasserstein Singular Vectors",
     long_description=long_description,
     long_description_content_type="text/markdown",
