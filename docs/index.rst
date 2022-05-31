@@ -63,6 +63,7 @@ Tips
 
 - We strongly encourage :code:`torch.double` precision for numerical stability.
 - You can easily run the demo notebook in Google Colab! Just use 'open from Github' and add :code:`!pip install wsingular` at the beginning.
+- If you want to stop the computation of singular vectors early, just hit :code:`Ctrl-C` and the function will return the result of the latest optimization step.
 
 Citing us
 ---------
