@@ -6,7 +6,9 @@
 # Wasserstein Singular Vectors
 
 <br>
+<div style='text-align:center'>
 <img src="https://user-images.githubusercontent.com/30904288/171128302-c37fdafb-f951-4c90-9ddf-61b4c6cfea9e.png" alt="fig_intro" width="500"/>
+</div>
 <br>
 
 `wsingular` is the Python package for the ICML 2022 paper "Unsupervised Ground Metric Learning Using Wasserstein Singular Vectors".
