@@ -17,8 +17,6 @@ setup(
     packages=["wsingular"],
     install_requires=[
         "torch",
-        "protobuf<=3.20.1",
-        "tensorboard",
         "pandas",
         "sklearn",
         "seaborn",
