@@ -10,8 +10,8 @@
 
 `wsingular` is the Python package for the ICML 2022 paper "Unsupervised Ground Metric Learning Using Wasserstein Singular Vectors".
 
-*Wasserstein Singular Vectors* simultaneously compute an OT distance between *samples* and an OT distance between *features* of a dataset.
-These distance matrices emerge naturally as positive singular vectors of the function mapping ground costs to pairwise OT distances.
+*Wasserstein Singular Vectors* simultaneously compute a Wasserstein distance between *samples* and a Wasserstein distance between *features* of a dataset.
+These distance matrices emerge naturally as positive singular vectors of the function mapping ground costs to pairwise Wasserstein distances.
 
 ## Get started
 
