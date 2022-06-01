@@ -13,7 +13,7 @@ def wasserstein_singular_vectors(
     n_iter: int,
     tau: float = 0,
     p: int = 1,
-    writer = None,
+    writer=None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
     C_ref: torch.Tensor = None,
@@ -24,7 +24,7 @@ def wasserstein_singular_vectors(
     """Performs power iterations and returns Wasserstein Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
-        dataset (torch.Tensor): The input dataset, rows as samples
+        dataset (torch.Tensor): The input dataset, rows as samples. Alternatively, you can give a tuple of tensors (A, B).
         dtype (str): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
@@ -43,22 +43,32 @@ def wasserstein_singular_vectors(
     """
 
     # Perform some sanity checks.
-    assert len(dataset.shape) == 2 # correct shape
-    assert torch.sum(dataset < 0) == 0 # positivity
-    assert n_iter > 0 # at least one iteration
-    assert tau >= 0 # a positive regularization
-    assert p > 0 # a valid norm
-    assert small_value > 0 # a positive numerical offset
-    assert normalization_steps > 0 # normalizing at least once
+    assert n_iter > 0  # at least one iteration
+    assert tau >= 0  # a positive regularization
+    assert p > 0  # a valid norm
+    assert small_value > 0  # a positive numerical offset
+    assert normalization_steps > 0  # normalizing at least once
 
-    # Make the transposed datasets A and B from the dataset.
-    A, B = utils.normalize_dataset(
-        dataset,
-        normalization_steps=normalization_steps,
-        small_value=small_value,
-        dtype=dtype,
-        device=device,
-    )
+    if type(dataset) is tuple:
+        assert len(dataset) == 2  # correct shape
+
+        A, B = dataset  # Recover A and B
+
+        assert torch.sum(A < 0) == 0  # positivity
+        assert torch.sum(B < 0) == 0  # positivity
+
+    else:
+        assert len(dataset.shape) == 2  # correct shape
+        assert torch.sum(dataset < 0) == 0  # positivity
+
+        # Make the transposed datasets A and B from the dataset.
+        A, B = utils.normalize_dataset(
+            dataset,
+            normalization_steps=normalization_steps,
+            small_value=small_value,
+            dtype=dtype,
+            device=device,
+        )
 
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
@@ -145,7 +155,7 @@ def sinkhorn_singular_vectors(
     tau: float = 0,
     eps: float = 5e-2,
     p: int = 1,
-    writer = None,
+    writer=None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
     C_ref: torch.Tensor = None,
@@ -156,7 +166,7 @@ def sinkhorn_singular_vectors(
     """Performs power iterations and returns Sinkhorn Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
-        dataset (torch.Tensor): The input dataset
+        dataset (torch.Tensor): The input dataset. Alternatively, you can give a tuple of tensors (A, B).
         dtype (str): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
@@ -176,23 +186,33 @@ def sinkhorn_singular_vectors(
     """
 
     # Perform some sanity checks.
-    assert len(dataset.shape) == 2 # correct shape
-    assert torch.sum(dataset < 0) == 0 # positivity
-    assert n_iter > 0 # at least one iteration
-    assert tau >= 0 # a positive regularization
-    assert eps >= 0 # a positive entropic regularization
-    assert p > 0 # a valid norm
-    assert small_value > 0 # a positive numerical offset
-    assert normalization_steps > 0 # normalizing at least once
+    assert n_iter > 0  # at least one iteration
+    assert tau >= 0  # a positive regularization
+    assert eps >= 0  # a positive entropic regularization
+    assert p > 0  # a valid norm
+    assert small_value > 0  # a positive numerical offset
+    assert normalization_steps > 0  # normalizing at least once
 
-    # Make the transposed datasets A and B from the dataset U.
-    A, B = utils.normalize_dataset(
-        dataset,
-        normalization_steps=normalization_steps,
-        small_value=small_value,
-        dtype=dtype,
-        device=device,
-    )
+    if type(dataset) is tuple:
+        assert len(dataset) == 2  # correct shape
+
+        A, B = dataset  # Recover A and B
+
+        assert torch.sum(A < 0) == 0  # positivity
+        assert torch.sum(B < 0) == 0  # positivity
+
+    else:
+        assert len(dataset.shape) == 2  # correct shape
+        assert torch.sum(dataset < 0) == 0  # positivity
+
+        # Make the transposed datasets A and B from the dataset.
+        A, B = utils.normalize_dataset(
+            dataset,
+            normalization_steps=normalization_steps,
+            small_value=small_value,
+            dtype=dtype,
+            device=device,
+        )
 
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
@@ -282,7 +302,7 @@ def stochastic_wasserstein_singular_vectors(
     p: int = 1,
     step_fn: Callable = lambda k: 1 / np.sqrt(k),
     mult_update: bool = False,
-    writer = None,
+    writer=None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
     C_ref: torch.Tensor = None,
@@ -292,7 +312,7 @@ def stochastic_wasserstein_singular_vectors(
     """Performs stochastic power iterations and returns Wasserstein Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
-        dataset (torch.Tensor): The input dataset
+        dataset (torch.Tensor): The input dataset.  Alternatively, you can give a tuple of tensors (A, B).
         dtype (torch.dtype): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
@@ -313,23 +333,33 @@ def stochastic_wasserstein_singular_vectors(
     """
 
     # Perform some sanity checks.
-    assert len(dataset.shape) == 2 # correct shape
-    assert torch.sum(dataset < 0) == 0 # positivity
-    assert n_iter > 0 # at least one iteration
-    assert tau >= 0 # a positive regularization
-    assert 0 < sample_prop <= 1 # a valid proportion
-    assert p > 0 # a valid norm
-    assert small_value > 0 # a positive numerical offset
-    assert normalization_steps > 0 # normalizing at least once
+    assert n_iter > 0  # at least one iteration
+    assert tau >= 0  # a positive regularization
+    assert 0 < sample_prop <= 1  # a valid proportion
+    assert p > 0  # a valid norm
+    assert small_value > 0  # a positive numerical offset
+    assert normalization_steps > 0  # normalizing at least once
 
-    # Make the transposed datasets A and B from the dataset U.
-    A, B = utils.normalize_dataset(
-        dataset,
-        normalization_steps=normalization_steps,
-        small_value=small_value,
-        dtype=dtype,
-        device=device,
-    )
+    if type(dataset) is tuple:
+        assert len(dataset) == 2  # correct shape
+
+        A, B = dataset  # Recover A and B
+
+        assert torch.sum(A < 0) == 0  # positivity
+        assert torch.sum(B < 0) == 0  # positivity
+
+    else:
+        assert len(dataset.shape) == 2  # correct shape
+        assert torch.sum(dataset < 0) == 0  # positivity
+
+        # Make the transposed datasets A and B from the dataset.
+        A, B = utils.normalize_dataset(
+            dataset,
+            normalization_steps=normalization_steps,
+            small_value=small_value,
+            dtype=dtype,
+            device=device,
+        )
 
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
@@ -484,7 +514,7 @@ def stochastic_sinkhorn_singular_vectors(
     p: int = 1,
     step_fn: Callable = lambda k: 1 / np.sqrt(k),
     mult_update: bool = False,
-    writer = None,
+    writer=None,
     small_value: float = 1e-6,
     normalization_steps: int = 1,
     C_ref: torch.Tensor = None,
@@ -494,7 +524,7 @@ def stochastic_sinkhorn_singular_vectors(
     """Performs stochastic power iterations and returns Sinkhorn Singular Vectors. Early stopping is possible with Ctrl-C.
 
     Args:
-        dataset (torch.Tensor): The input dataset
+        dataset (torch.Tensor): The input dataset.  Alternatively, you can give a tuple of tensors (A, B).
         dtype (torch.dtype): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
@@ -516,24 +546,34 @@ def stochastic_sinkhorn_singular_vectors(
     """
 
     # Perform some sanity checks.
-    assert len(dataset.shape) == 2 # correct shape
-    assert torch.sum(dataset < 0) == 0 # positivity
-    assert n_iter > 0 # at least one iteration
-    assert tau >= 0 # a positive regularization
-    assert 0 < sample_prop <= 1 # a valid proportion
-    assert eps >= 0 # a positive entropic regularization
-    assert p > 0 # a valid norm
-    assert small_value > 0 # a positive numerical offset
-    assert normalization_steps > 0 # normalizing at least once
+    assert n_iter > 0  # at least one iteration
+    assert tau >= 0  # a positive regularization
+    assert 0 < sample_prop <= 1  # a valid proportion
+    assert eps >= 0  # a positive entropic regularization
+    assert p > 0  # a valid norm
+    assert small_value > 0  # a positive numerical offset
+    assert normalization_steps > 0  # normalizing at least once
 
-    # Make the transposed datasets A and B from the dataset U.
-    A, B = utils.normalize_dataset(
-        dataset,
-        normalization_steps=normalization_steps,
-        small_value=small_value,
-        dtype=dtype,
-        device=device,
-    )
+    if type(dataset) is tuple:
+        assert len(dataset) == 2  # correct shape
+
+        A, B = dataset  # Recover A and B
+
+        assert torch.sum(A < 0) == 0  # positivity
+        assert torch.sum(B < 0) == 0  # positivity
+
+    else:
+        assert len(dataset.shape) == 2  # correct shape
+        assert torch.sum(dataset < 0) == 0  # positivity
+
+        # Make the transposed datasets A and B from the dataset.
+        A, B = utils.normalize_dataset(
+            dataset,
+            normalization_steps=normalization_steps,
+            small_value=small_value,
+            dtype=dtype,
+            device=device,
+        )
 
     # Compute the regularization matrices.
     R_A = utils.regularization_matrix(A, p=p, dtype=dtype, device=device)
