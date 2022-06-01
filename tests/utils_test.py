@@ -1,3 +1,4 @@
+from Code.wsv.Wass_Singular.wass_singular.wsingular.utils import silhouette
 from context import wsingular
 from context import utils
 from context import distance
@@ -39,6 +40,26 @@ def test_random_distance():
 
     # Assert positivity of D.
     assert torch.sum(D < 0) == 0
+
+def test_hilbert_distance():
+
+    # Generate random distance matrices.
+    D_1 = wsingular.utils.random_distance(n_samples, dtype=dtype, device=device)
+    D_2 = wsingular.utils.random_distance(n_samples, dtype=dtype, device=device)
+
+    # Compute Hilbert distance.
+    dist = wsingular.utils.hilbert_distance(D_1, D_2)
+
+    # Assert distance is strictly positive.
+    assert dist > 0
+
+def test_silhouette():
+
+    # Generate a random distance matrix.
+    D = wsingular.utils.random_distance(n_samples, dtype=dtype, device=device)
+
+    # Compute silhouette score.
+    wsingular.utils.silhouette(D, ['label']*n_samples)
 
 def test_regularization_matrix():
 
