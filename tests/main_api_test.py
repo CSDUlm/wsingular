@@ -38,6 +38,8 @@ def test_wasserstein_singular_vectors():
         n_iter=10,
         dtype=dtype,
         device=device,
+        progress_bar=True,
+        tau=1e-3,
     )
 
     # Assert positivity of C.
@@ -57,6 +59,7 @@ def test_sinkhorn_singular_vectors():
         device=device,
         n_iter=10,
         progress_bar=True,
+        tau=1e-3,
     )
 
     # Assert positivity of C.
@@ -74,6 +77,8 @@ def test_stochastic_wasserstein_singular_vectors():
         n_iter=20,
         dtype=dtype,
         device=device,
+        progress_bar=True,
+        tau=1e-3,
     )
 
     # Assert positivity of C.
@@ -93,6 +98,7 @@ def test_stochastic_sinkhorn_singular_vectors():
         device=device,
         n_iter=20,
         progress_bar=True,
+        tau=1e-3,
     )
 
     # Assert positivity of C.
