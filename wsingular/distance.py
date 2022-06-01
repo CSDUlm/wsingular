@@ -8,10 +8,10 @@ from tqdm import tqdm
 def wasserstein_map(
     A: torch.Tensor,
     C: torch.Tensor,
-    R: torch.Tensor,
-    tau: float,
     dtype: torch.dtype,
     device: str,
+    R: torch.Tensor = None,
+    tau: float = 0,
     progress_bar: bool = False,
 ) -> torch.Tensor:
     """This function maps a ground cost to the Wasserstein distance matrix on a certain dataset using that ground cost. R is an added regularization.
@@ -19,10 +19,10 @@ def wasserstein_map(
     Args:
         A (torch.Tensor): The input dataset, rows as samples.
         C (torch.Tensor): the ground cost.
-        R (torch.Tensor): The regularization matrix.
-        tau (float): The regularization parameter.
         dtype (torch.dtype): The dtype.
         device (str): The device.
+        R (torch.Tensor): The regularization matrix. Defaults to None.
+        tau (float): The regularization parameter. Defaults to 0.
         progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False
 
     Returns:
@@ -70,11 +70,11 @@ def wasserstein_map(
 def sinkhorn_map(
     A: torch.Tensor,
     C: torch.Tensor,
-    R: torch.Tensor,
-    tau: float,
     eps: float,
     dtype: torch.dtype,
     device: str,
+    R: torch.Tensor = None,
+    tau: float = 0,
     progress_bar: bool = False,
     stop_threshold: float = 1e-5,
     num_iter_max: int = 500,
@@ -84,11 +84,11 @@ def sinkhorn_map(
     Args:
         A (torch.Tensor): The input dataset, rows as samples.
         C (torch.Tensor): The ground cost.
-        R (torch.Tensor): The added regularization.
-        tau (float): The regularization parameter for R.
         eps (float): The entropic regularization parameter.
         dtype (torch.dtype): The dtype.
         device (str): The device.
+        R (torch.Tensor): The added regularization. Defaults to None.
+        tau (float): The regularization parameter. Defaults to 0.
         progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
         stop_threshold (float, optional): Stopping threshold for Sinkhorn (please refer to POT). Defaults to 1e-5.
         num_iter_max (int, optional): Maximum number of Sinkhorn iterations (please refer to POT). Defaults to 500.
@@ -179,12 +179,12 @@ def stochastic_wasserstein_map(
     A: torch.Tensor,
     D: torch.Tensor,
     C: torch.Tensor,
-    R: torch.Tensor,
     sample_prop: float,
-    tau: float,
     gamma: float,
     dtype: torch.dtype,
     device: str,
+    R: torch.Tensor = None,
+    tau: float = 0,
     progress_bar: bool = False,
     return_indices: bool = False,
 ) -> torch.Tensor:
@@ -195,12 +195,12 @@ def stochastic_wasserstein_map(
         A (torch.Tensor): The input dataset.
         D (torch.Tensor): The intialization of the distance matrix
         C (torch.Tensor): The ground cost
-        R (torch.Tensor): The regularization matrix.
         sample_prop (float): The proportion of indices to update
-        tau (float): The regularization parameter for R
         gamma (float): A scaling factor
         dtype (torch.dtype): The dtype
         device (str): The device
+        R (torch.Tensor): The regularization matrix. Defaults to None.
+        tau (float): The regularization parameter. Defaults to 0.
         progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
         return_indices (bool): Whether to return the updated indices. Defaults to False.
         stop_threshold (float, optional): Stopping threshold for Sinkhorn (please refer to POT). Defaults to 1e-5.
@@ -278,11 +278,11 @@ def stochastic_sinkhorn_map(
     A: torch.Tensor,
     D: torch.Tensor,
     C: torch.Tensor,
-    R: torch.Tensor,
     sample_prop: float,
-    tau: float,
     gamma: float,
     eps: float,
+    R: torch.Tensor = None,
+    tau: float = 0,
     progress_bar: bool = False,
     return_indices: bool = False,
     batch_size: int = 50,
@@ -296,11 +296,11 @@ def stochastic_sinkhorn_map(
         A (torch.Tensor): The input dataset.
         D (torch.Tensor): The intialization of the distance matrix
         C (torch.Tensor): The ground cost
-        R (torch.Tensor): The regularization matrix.
         sample_prop (float): The proportion of indices to update
-        tau (float): The regularization parameter for R
         gamma (float): Rescaling parameter. In practice, one should rescale by an approximation of the singular value.
         eps (float): The entropic regularization parameter
+        R (torch.Tensor): The regularization matrix. Defaults to None.
+        tau (float): The regularization parameter. Defaults to 0.
         progress_bar (bool): Whether to show a progress bar during the computation. Defaults to False.
         return_indices (bool): Whether to return the updated indices. Defaults to False.
         batch_size (int): Batch size, i.e. how many distances to compute at the same time. Depends on your available GPU memory. Defaults to 50.

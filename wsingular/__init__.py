@@ -11,7 +11,7 @@ def wasserstein_singular_vectors(
     dtype: torch.dtype,
     device: str,
     n_iter: int,
-    tau: float = 1e-3,
+    tau: float = 0,
     p: int = 1,
     writer = None,
     small_value: float = 1e-6,
@@ -28,7 +28,7 @@ def wasserstein_singular_vectors(
         dtype (str): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
-        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 0.
         p (int, optional): The order of the norm R. Defaults to 1.
         writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
         small_value (float, optional): A small value for numerical stability. Defaults to 1e-6.
@@ -142,7 +142,7 @@ def sinkhorn_singular_vectors(
     dtype: str,
     device: str,
     n_iter: int,
-    tau: float = 1e-3,
+    tau: float = 0,
     eps: float = 5e-2,
     p: int = 1,
     writer = None,
@@ -160,7 +160,7 @@ def sinkhorn_singular_vectors(
         dtype (str): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
-        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 0.
         eps (float): The entropic regularization parameter.
         p (int, optional): The order of the norm R. Defaults to 1.
         writer (SummaryWriter, optional): If set, the progress will be written to the Tensorboard writer. Defaults to None.
@@ -277,7 +277,7 @@ def stochastic_wasserstein_singular_vectors(
     dtype: torch.dtype,
     device: str,
     n_iter: int,
-    tau: float = 1e-3,
+    tau: float = 0,
     sample_prop: float = 1e-1,
     p: int = 1,
     step_fn: Callable = lambda k: 1 / np.sqrt(k),
@@ -296,7 +296,7 @@ def stochastic_wasserstein_singular_vectors(
         dtype (torch.dtype): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
-        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 0.
         sample_prop (float, optional): The proportion of indices to update at each step. Defaults to 1e-1.
         p (int, optional): The order of the norm R. Defaults to 1.
         step_fn (Callable, optional): The function that defines step size from the iteration number (which starts at 1). Defaults to lambdak:1/np.sqrt(k).
@@ -478,7 +478,7 @@ def stochastic_sinkhorn_singular_vectors(
     dtype: torch.dtype,
     device: str,
     n_iter: int,
-    tau: float = 1e-3,
+    tau: float = 0,
     eps: float = 5e-2,
     sample_prop: float = 1e-1,
     p: int = 1,
@@ -498,7 +498,7 @@ def stochastic_sinkhorn_singular_vectors(
         dtype (torch.dtype): The dtype
         device (str): The device
         n_iter (int): The number of power iterations.
-        tau (float, optional): The regularization parameter for the norm R. Defaults to 1e-3.
+        tau (float, optional): The regularization parameter for the norm R. Defaults to 0.
         eps (float, optional): The entropic regularization parameter. Defaults to 5e-2.
         sample_prop (float, optional): The proportion of indices to update at each step. Defaults to 1e-1.
         p (int, optional): The order of the norm R. Defaults to 1.
