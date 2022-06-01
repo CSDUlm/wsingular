@@ -179,9 +179,9 @@ def check_uniqueness(
                     adj[m * m + i * n + j, l * m + m] = P[i, j]
 
     # Check if the graph is connected.
-    weak_labels = get_connected_components(adj, connection="weak")
+    strong_labels = get_connected_components(adj, connection="strong")
 
-    return len(np.unique(weak_labels)) == 1
+    return len(np.unique(strong_labels)) == 1
 
 
 def silhouette(D: torch.Tensor, labels: Iterable) -> float:
