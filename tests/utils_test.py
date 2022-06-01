@@ -3,6 +3,7 @@ from context import utils
 from context import distance
 
 import torch
+import numpy as np
 
 # Define the dtype and device to work with.
 dtype = torch.double
@@ -57,8 +58,11 @@ def test_silhouette():
     # Generate a random distance matrix.
     D = wsingular.utils.random_distance(n_samples, dtype=dtype, device=device)
 
+    # Dummy labels
+    labels = np.random.choice([0, 1], size=n_samples)
+
     # Compute silhouette score.
-    wsingular.utils.silhouette(D, ['label']*n_samples)
+    wsingular.utils.silhouette(D, labels)
 
 def test_regularization_matrix():
 
