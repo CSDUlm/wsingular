@@ -79,7 +79,7 @@ def wasserstein_singular_vectors(
             D_new = distance.wasserstein_map(
                 A,
                 C,
-                R_A,
+                R=R_A,
                 tau=tau,
                 dtype=dtype,
                 device=device,
@@ -104,7 +104,7 @@ def wasserstein_singular_vectors(
             C_new = distance.wasserstein_map(
                 B,
                 D,
-                R_B,
+                R=R_B,
                 tau=tau,
                 dtype=dtype,
                 device=device,
@@ -214,7 +214,7 @@ def sinkhorn_singular_vectors(
             D_new = distance.sinkhorn_map(
                 A,
                 C,
-                R_A,
+                R=R_A,
                 tau=tau,
                 eps=eps,
                 dtype=dtype,
@@ -238,7 +238,7 @@ def sinkhorn_singular_vectors(
             C_new = distance.sinkhorn_map(
                 B,
                 D,
-                R_B,
+                R=R_B,
                 tau=tau,
                 eps=eps,
                 dtype=dtype,
