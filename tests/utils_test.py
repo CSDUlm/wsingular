@@ -1,4 +1,3 @@
-from Code.wsv.Wass_Singular.wass_singular.wsingular.utils import silhouette
 from context import wsingular
 from context import utils
 from context import distance
