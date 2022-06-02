@@ -9,4 +9,4 @@ scipy
 tqdm
 numpy
 pot>=0.8
-scikit-network
+networkx

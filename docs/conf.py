@@ -27,7 +27,7 @@ autodoc_mock_imports = [
     "tqdm",
     "numpy",
     "ot",
-    "sknetwork",
+    "networkx",
 ]
 
 # -- Project information -----------------------------------------------------

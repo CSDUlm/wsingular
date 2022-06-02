@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import ot
-from sknetwork.topology import get_connected_components
+import networkx as nx
 
 
 def random_distance(size: int, dtype: str, device: str) -> torch.Tensor:
@@ -130,7 +130,7 @@ def check_uniqueness(
     C: torch.Tensor,
     D: torch.Tensor,
 ) -> bool:
-    """Check uniqueness of singular vectors using the graph connectivity criterion described in the paper. Caution: transport plans such that the graph is connected might exist even if this returns False. If you want to check uniqueness, consider mointoring the Hilbert distance between several outcomes of the power iterations.
+    """Check uniqueness of singular vectors using the graph connectivity criterion described in the paper.
 
     Args:
         A (torch.Tensor): The samples.
@@ -139,49 +139,75 @@ def check_uniqueness(
         D (torch.Tensor): The pairwise distance.
 
     Returns:
-        bool: Whether the criterion is verified. Caution, this might be a False negative because we do not check all possible transport plans.
+        bool: Whether the criterion is verified.
     """
 
     # Get the shapes of pairwise distance matrices.
-    m, n = C.shape[0], D.shape[0]
+    n_features, n_samples = C.shape[0], D.shape[0]
 
-    # Initialize the directed adjacency matrix.
-    adj = np.zeros((m * m + n * n, m * m + n * n))
+    # Initialize an empty directed graph.
+    DG = nx.DiGraph()
+
+    # Add the 'ij' nodes.
+    for i in range(n_samples):
+        for j in range(n_samples):
+            DG.add_node(','.join(['ij', str(i), str(j)]))
+
+    # Add the 'kl' nodes.
+    for k in range(n_features):
+        for l in range(n_features):
+            DG.add_node(','.join(['kl', str(k), str(l)]))
 
     # Iterate over samples.
-    for i in range(n):
+    for i in range(n_samples):
         for j in range(i + 1):
 
             # Compute the transport plan between these samples.
             P = ot.emd(A[i].contiguous(), A[j].contiguous(), C)
 
             # Iterate over features.
-            for k in range(m):
-                for l in range(m):
+            for k in range(n_features):
+                for l in range(n_features):
 
                     # Fill the adjacency matrix.
-                    adj[k * m + l, m * m + i * n + j] = P[k, l]
-                    adj[k * m + l, m * m + j * n + i] = P[k, l]
+                    DG.add_weighted_edges_from([(
+                        ','.join(['ij', str(i), str(j)]),
+                        ','.join(['kl', str(k), str(l)]),
+                        P[k, l]
+                    )])
+
+                    DG.add_weighted_edges_from([(
+                        ','.join(['ij', str(j), str(i)]),
+                        ','.join(['kl', str(k), str(l)]),
+                        P[k, l]
+                    )])
 
     # Iterate over features.
-    for k in range(m):
+    for k in range(n_features):
         for l in range(k + 1):
 
             # Compute the transport plan between these features.
             P = ot.emd(B[k].contiguous(), B[l].contiguous(), D)
 
             # Iterate over samples.
-            for i in range(n):
-                for j in range(n):
+            for i in range(n_samples):
+                for j in range(n_samples):
 
                     # Fill the adjacency matrix.
-                    adj[m * m + i * n + j, k * m + l] = P[i, j]
-                    adj[m * m + i * n + j, l * m + m] = P[i, j]
+                    DG.add_weighted_edges_from([(
+                        ','.join(['kl', str(k), str(l)]),
+                        ','.join(['ij', str(i), str(j)]),
+                        P[i, j]
+                    )])
 
-    # Check if the graph is connected.
-    strong_labels = get_connected_components(adj, connection="strong")
+                    DG.add_weighted_edges_from([(
+                        ','.join(['kl', str(l), str(k)]),
+                        ','.join(['ij', str(i), str(j)]),
+                        P[i, j]
+                    )])
 
-    return len(np.unique(strong_labels)) == 1
+    # Check that there is only one connected component.
+    return len(list(nx.strongly_connected_components(DG))) == 1
 
 
 def silhouette(D: torch.Tensor, labels: Iterable) -> float:
