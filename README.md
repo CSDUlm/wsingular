@@ -1,6 +1,6 @@
 [![PyPI version](https://img.shields.io/pypi/v/wsingular)](https://pypi.org/project/wsingular/)
 [![Tests](https://github.com/gjhuizing/wsingular/actions/workflows/tests.yml/badge.svg)](https://github.com/gjhuizing/wsingular/actions/workflows/tests.yml)
-[![codecov](https://codecov.io/gh/gjhuizing/wsingular/branch/main/graph/badge.svg?token=JGIN7X8NXS)](https://codecov.io/gh/gjhuizing/wsingular)
+[![codecov](https://codecov.io/gh/CSDUlm/wsingular/branch/main/graph/badge.svg?token=JGIN7X8NXS)](https://codecov.io/gh/CSDUlm/wsingular)
 [![Documentation Status](https://readthedocs.org/projects/wsingular/badge/?version=latest)](https://wsingular.readthedocs.io/en/latest/?badge=latest)
 
 # Wasserstein Singular Vectors
