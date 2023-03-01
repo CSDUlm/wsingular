@@ -5,6 +5,8 @@ from typing import Callable, Tuple
 from wsingular import distance
 from wsingular import utils
 
+__version__ = "0.1.7"
+
 
 def wasserstein_singular_vectors(
     dataset: torch.Tensor,

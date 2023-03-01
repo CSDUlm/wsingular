@@ -7,7 +7,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="wsingular",
-    version="0.1.6",
+    version="0.1.7",
     description="Wasserstein Singular Vectors",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -18,7 +18,7 @@ setup(
     install_requires=[
         "torch",
         "pandas",
-        "sklearn",
+        "scikit-learn",
         "seaborn",
         "matplotlib",
         "scipy",
