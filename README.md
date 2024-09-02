@@ -32,3 +32,7 @@ The conference proceedings will be out soon. In the meantime you can cite our ar
       journal={arXiv preprint arXiv:2102.06278},
       year={2021}
     }
+
+## Single-cell experiments
+
+Code and data to reproduce the single-cell experiment are available here: https://figshare.com/s/b4904dfc0898e3837c77. For further methodological development, we advise looking into larger datasets with curated annotation, e.g. https://arxiv.org/pdf/2106.06345 (section 4.2), https://data.humancellatlas.org/ (e.g. the lung dataset), or https://cellxgene.cziscience.com/collections .
